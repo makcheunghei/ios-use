@@ -15,7 +15,7 @@ class StateDirectoryTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.home = Path(temporary.name)
-        self.current = self.home / '.local/share/iphone-use'
+        self.current = self.home / '.local/share/ios-use'
         self.previous = self.home / '.local/share/iphone-use-wda'
         for patcher in [patch('wda_setup.Path.home', return_value=self.home),
                         patch.dict(os.environ, {}, clear=True)]:
@@ -41,6 +41,14 @@ class StateDirectoryTests(unittest.TestCase):
         (self.previous / 'config.json').write_text('{}')
         self.current.mkdir()
         self.assertEqual(state_directory(), self.current)
+
+    def test_upgrade_reuses_independent_iphone_use_device_profiles(self):
+        legacy = self.home / ".local/share/iphone-use"
+        profile = legacy / "devices/test-device/config.json"
+        profile.parent.mkdir(parents=True)
+        profile.write_text("{}")
+        self.assertEqual(state_directory(), legacy)
+        self.assertFalse(self.current.exists())
 
     def test_explicit_and_environment_directory_priority(self):
         with patch.dict(os.environ, {'IPHONE_USE_STATE_DIR': '/new', 'WDA_STATE_DIR': '/old'}):

@@ -1,6 +1,6 @@
-# iPhone Use for WorkBuddy
+# iOS Use for WorkBuddy
 
-把 [iPhone Use](../README.md) 接入腾讯 WorkBuddy：同一套 MCP 服务、同一套技能，让 WorkBuddy 通过 USB 操作真实 iPhone。
+把 [iOS Use](../README.md) 接入腾讯 WorkBuddy：同一套 MCP 服务、同一套技能，让 WorkBuddy 通过 USB 操作真实 iPhone。
 
 这个目录是叠加在原版（Codex 版）之上的适配层，不修改仓库里已有的任何文件。依赖与 [安装依赖](../README.md#安装依赖) 相同：macOS、完整 Xcode、USB 连接的 iPhone、Python 3.9+、Node.js 20.19+ / 22.12+ / 24+。
 
@@ -12,14 +12,14 @@ python3 workbuddy/install.py
 
 然后在 WorkBuddy 里完成两步，安装器无法代劳：
 
-1. 打开「连接器管理」，在自定义连接器里找到 `iphone_use`，点「信任」。
+1. 打开「连接器管理」，在自定义连接器里找到 `ios_use`，点「信任」。
 2. 新开一个会话，工具和技能在新会话才加载。
 
 在新会话里输入：
 
-> 用 iphone-use-setup 帮我配置通过 USB 连接的 iPhone，验证 READY，然后显示手机屏幕。
+> 用 ios-use-setup 帮我配置通过 USB 连接的 iPhone，验证 READY，然后显示手机屏幕。
 
-已经用 Codex 版配置过的手机不需要重新签名和构建：两个宿主共用 `~/.local/share/iphone-use` 里的设备配置、WDA 构建和操作锁，WorkBuddy 会直接复用。
+已经用 Codex 版配置过的手机不需要重新签名和构建：两个宿主共用 `~/.local/share/ios-use` 里的设备配置、WDA 构建和操作锁，WorkBuddy 会直接复用。
 
 ## 安装器做了什么
 
@@ -27,9 +27,9 @@ WorkBuddy 没有插件命令行，安装器按它自己放本地 MCP 的约定�
 
 | 位置 | 内容 |
 | --- | --- |
-| `~/.workbuddy/mcp-servers/iphone-use/` | 原版安装包（服务、USB 工具、屏幕 widget）加 WorkBuddy 入口 `workbuddy/mcp_server.py` |
-| `~/.workbuddy/mcp.json` | 在 `mcpServers` 里合并一项 `iphone_use`，其他服务原样保留，改动前留一份 `mcp.json.bak-*` |
-| `~/.workbuddy/skills/` | `iphone-use` 与 `iphone-use-setup` 两个技能 |
+| `~/.workbuddy/mcp-servers/ios-use/` | 原版安装包（服务、USB 工具、屏幕 widget）加 WorkBuddy 入口 `workbuddy/mcp_server.py` |
+| `~/.workbuddy/mcp.json` | 在 `mcpServers` 里合并一项 `ios_use`，其他服务原样保留，改动前留一份 `mcp.json.bak-*` |
+| `~/.workbuddy/skills/` | `ios-use` 与 `ios-use-setup` 两个技能 |
 
 写入前会用 WorkBuddy 实际使用的命令和环境启动一次服务，确认 `initialize` 与 `tools/list` 正常，失败则不改动任何文件。已存在但不是本安装器写入的同名服务或目录不会被覆盖，除非加 `--force`。
 
@@ -57,7 +57,7 @@ WorkBuddy 没有插件命令行，安装器按它自己放本地 MCP 的约定�
 
 - **在侧边栏打开。** WorkBuddy 默认把面板嵌在对话里，每次工具调用新增一个。工具声明里加上 `_meta.workbuddy.ui.launchSurface = "panel"` 后改在侧边栏打开，同一对话里重复调用会复用同一个面板。
 - **只有 `pua_screen` 打开面板。** WorkBuddy 把每个带界面的工具当成一个独立的 App，原版让 `pua_ready` 和 `pua_screen` 都带界面，就会出现两个面板。入口去掉了 `pua_ready` 上的界面声明，并在说明里告诉模型：本对话第一次 READY 后调用一次 `pua_screen()`。
-- **画面按资源读取。** widget 每 250 毫秒用工具调用 `pua_screen_frame` 取一帧。WorkBuddy 的 agent 在转发面板发起的工具调用前要做「敏感数据外发审查」，这条路径没有会话信息，审查直接失败，返回一句 `Sensitive MCP egress review is unavailable.`，请求到不了服务，面板会一直停在「连接中」。面板发起的资源读取则会被转发。所以页面里取帧的那一次调用改成读取 `ui://iphone-use/frame/<after_seq>/<last_event_id>`，入口把这个读取交给原来的取帧逻辑。只有这一个只读的取帧走这条路。
+- **画面按资源读取。** widget 每 250 毫秒用工具调用 `pua_screen_frame` 取一帧。WorkBuddy 的 agent 在转发面板发起的工具调用前要做「敏感数据外发审查」，这条路径没有会话信息，审查直接失败，返回一句 `Sensitive MCP egress review is unavailable.`，请求到不了服务，面板会一直停在「连接中」。面板发起的资源读取则会被转发。所以页面里取帧的那一次调用改成读取 `ui://ios-use/frame/<after_seq>/<last_event_id>`，入口把这个读取交给原来的取帧逻辑。只有这一个只读的取帧走这条路。
 - **画面流由一个常驻进程持有。** 面板的每一次资源读取，WorkBuddy 都新起一个服务进程来回答，读完即退。原版把 USB 画面流和最新一帧放在服务进程的内存里，在这里每次读取都是一个刚启动、还没有画面的进程，面板只会显示「未连接」。所以画面流交给 [preview.py](preview.py)：它脱离服务进程运行，各次读取通过状态目录里的 Unix socket 向它要最新一帧。画面仍只在内存里，只有面板在读时才采集，30 秒没人读就退出。
 - **面板直接向画面进程取帧。** WorkBuddy 每次读取都要启动一个进程，每秒只能读约 4 次。所以 [preview.py](preview.py) 另外在本机回环地址上开了一个 HTTP 端：面板第一次经 WorkBuddy 读取时得知它的地址，之后页面自己向它请求，每个请求挂起到下一帧出现为止，拿到就画。此后不再经过 WorkBuddy，画面跟手机几乎同步。入口同时把手机端画面流设为每秒 30 帧、半尺寸（原版默认 10 帧、原尺寸；面板里的手机只有三百点宽，半尺寸不损失清晰度）。
   帧率的上限在手机端：WDA 每帧都要截一次全分辨率的屏。iPhone 17 Pro Max 上实测一帧约 36 毫秒，即每秒约 28 帧；把设置提到 60、调低画质或尺寸，出帧都不会更快。
@@ -82,7 +82,7 @@ git pull --ff-only
 python3 workbuddy/install.py
 ```
 
-更新后新开会话。卸载会移除注册项、安装目录和两个技能，保留 `~/.local/share/iphone-use` 中的手机配置与构建：
+更新后新开会话。卸载会移除注册项、安装目录和两个技能，保留 `~/.local/share/ios-use` 中的手机配置与构建：
 
 ```sh
 python3 workbuddy/install.py --uninstall

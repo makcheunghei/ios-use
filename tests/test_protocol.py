@@ -143,7 +143,7 @@ class ProtocolTests(unittest.TestCase):
         ])
         self.assertEqual([response["id"] for response in responses], [1, "ping", 3])
         self.assertEqual(responses[0]["result"]["protocolVersion"], "2025-06-18")
-        self.assertEqual(responses[0]["result"]["serverInfo"]["name"], "iphone-use")
+        self.assertEqual(responses[0]["result"]["serverInfo"]["name"], "ios-use")
         self.assertEqual(responses[1]["result"], {})
         tools = responses[2]["result"]["tools"]
         names = [tool["name"] for tool in tools]

@@ -2,6 +2,8 @@
 
 ## 0.4.0 — 2026-11-20
 
+- 專案更名為 iOS Use。插件識別名為 `ios-use`，MCP 名稱為 `ios_use`。已有裝置沿用原有設定。
+
 - 加入按裝置分流的 session、USB 連接埠及預覽。首次純讀屏可用 `screen_only=true` 跳過 XML。
 - 橫屏預覽根據 JPEG EXIF 計算顯示尺寸，點按前核對方向及影格。SpringBoard 的直向圖示座標按所屬視窗轉換。
 - 更新至 Appium WebDriverAgent 17.0.12。啟動前檢查構建紀錄及描述檔裝置資格。

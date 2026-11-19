@@ -46,7 +46,7 @@ READY 的 `pua_timeout` 不进入重启流程：按 `retry_after_seconds` 在宿
 python3 <PLUGIN_ROOT>/scripts/phone.py pua_press_button '{"name":"home","observe":"none","verify":false}'
 ```
 
-脚本使用默认 `~/.local/share/iphone-use` 的共享会话与操作锁，返回结构化结果。下一步需要未知页面信息时在本次动作显式选择 observe；需要关键验收时显式 verify=true。命令输出只有 JSON：截图位于 `image.path`（已缩放的 JPEG，同名 `.png` 是原始截图），需要查看时用可用的图片工具打开，像素乘以 `image.pixel_to_point` 得到 iPhone 点。
+脚本使用默认 `~/.local/share/ios-use` 的共享会话与操作锁，返回结构化结果。下一步需要未知页面信息时在本次动作显式选择 observe；需要关键验收时显式 verify=true。命令输出只有 JSON：截图位于 `image.path`（已缩放的 JPEG，同名 `.png` 是原始截图），需要查看时用可用的图片工具打开，像素乘以 `image.pixel_to_point` 得到 iPhone 点。
 
 只有原通道确实使用非默认目录 / URL 才传匹配的 --state-dir / --url；不得为避开 busy 换目录或并行控制同一设备。
 

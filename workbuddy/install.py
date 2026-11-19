@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Install iPhone Use into WorkBuddy as a standard MCP server plus two skills.
+"""Install iOS Use into WorkBuddy as a standard MCP server plus two skills.
 
 WorkBuddy has no plugin CLI, so this follows its own convention for local servers:
 code under ~/.workbuddy/mcp-servers/<name>, one entry in ~/.workbuddy/mcp.json and
-skills under ~/.workbuddy/skills. Phone state stays in ~/.local/share/iphone-use,
+skills under ~/.workbuddy/skills. Phone state stays in ~/.local/share/ios-use,
 shared with a Codex install.
 """
 import argparse
@@ -22,9 +22,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import host_text
 
-NAME = "iphone-use"
-SERVER = "iphone_use"
-SKILLS = ("iphone-use", "iphone-use-setup")
+NAME = "ios-use"
+SERVER = "ios_use"
+SKILLS = ("ios-use", "ios-use-setup")
 MARKER = ".workbuddy-install.json"
 RUNTIME_FILES = ("mcp_server.py", "host_text.py", "preview.py")
 SCREEN_PAGE = "assets/phone-screen.html"
@@ -88,7 +88,7 @@ def handshake(entry):
                  "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "workbuddy-install", "version": "0"}}},
                 {"jsonrpc": "2.0", "method": "notifications/initialized"},
                 {"jsonrpc": "2.0", "id": 2, "method": "tools/list"}]
-    with tempfile.TemporaryDirectory(prefix="iphone-use-check-") as state:
+    with tempfile.TemporaryDirectory(prefix="ios-use-check-") as state:
         env = {**entry["env"], "HOME": str(Path.home()), "IPHONE_USE_STATE_DIR": state, "IPHONE_USE_ANALYTICS": "0"}
         try:
             done = subprocess.run([entry["command"], *entry["args"]], input="".join(json.dumps(r) + "\n" for r in requests),
@@ -183,7 +183,7 @@ def install(home, python, analytics=False, force=False):
         if not owned(path, home, force):
             raise InstallError(f"{path} exists and was not installed by this script. Move it or pass --force.")
 
-    with tempfile.TemporaryDirectory(prefix="iphone-use-stage-") as staging:
+    with tempfile.TemporaryDirectory(prefix="ios-use-stage-") as staging:
         staged = Path(staging) / NAME
         staged.mkdir()
         version = stage(staged)
@@ -195,6 +195,9 @@ def install(home, python, analytics=False, force=False):
         replace_directory(staged, install_dir)
     for directory in skill_dirs:
         replace_directory(install_dir / "skills" / directory.name, directory)
+    previous_dir = home / "mcp-servers/iphone-use"
+    if (previous_dir / MARKER).is_file() and ours(servers.get("iphone_use"), previous_dir):
+        del servers["iphone_use"]
     servers[SERVER] = entry
     changed = write_config(config_path, config)
     return {"version": version, "tools": tools, "install_dir": str(install_dir), "skills": [str(d) for d in skill_dirs],
@@ -234,7 +237,7 @@ def main():
             print("\n".join(["Removed:"] + removed) if removed else "Nothing to remove.")
             return 0
         if sys.platform != "darwin":
-            raise InstallError("iPhone Use needs macOS with Xcode.")
+            raise InstallError("iOS Use needs macOS with Xcode.")
         python = shutil.which(args.python) or args.python
         if not Path(python).is_absolute() or not os.access(python, os.X_OK):
             raise InstallError(f"--python must resolve to an executable: {args.python}")
@@ -242,14 +245,14 @@ def main():
     except (InstallError, host_text.Drift) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    print(f"iPhone Use {result['version']} installed for WorkBuddy ({result['tools']} tools).")
+    print(f"iOS Use {result['version']} installed for WorkBuddy ({result['tools']} tools).")
     print(f"  server  {result['install_dir']}")
     print(f"  config  {result['config']} -> mcpServers.{SERVER}" + ("" if result["config_changed"] else " (unchanged)"))
     for directory in result["skills"]:
         print(f"  skill   {directory}")
     if not all(shutil.which(name) for name in ("node", "npm")):
         print("warning: node or npm was not found on PATH; install Node.js 20.19+ and run this script again.")
-    print("Next: in WorkBuddy open 连接器管理, trust iphone_use, then start a new chat.")
+    print("Next: in WorkBuddy open 连接器管理, trust ios_use, then start a new chat.")
     return 0
 
 

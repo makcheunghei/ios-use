@@ -23,7 +23,7 @@ def main():
         records.append({'method':method,'seconds':round(time.monotonic()-started,3)})
         return response['result']
     try:
-        init=rpc('initialize',{'protocolVersion':'2025-06-18','capabilities':{},'clientInfo':{'name':'iphone-use-smoke','version':'1.0'}})
+        init=rpc('initialize',{'protocolVersion':'2025-06-18','capabilities':{},'clientInfo':{'name':'ios-use-smoke','version':'1.0'}})
         child.stdin.write(json.dumps({'jsonrpc':'2.0','method':'notifications/initialized'})+'\n');child.stdin.flush()
         catalog=rpc('tools/list',{})
         rpc('ping',{})

@@ -32,12 +32,12 @@ class PackagingTests(unittest.TestCase):
             target.write_text('local-only fixture')
         (cls.root / 'server/posthog.local.json').write_text('{"projectToken":"local-only-token"}')
         subprocess.run([sys.executable, str(cls.root / 'scripts/package.py')], check=True, capture_output=True, text=True)
-        cls.stage = cls.root / 'dist/iphone-use'
+        cls.stage = cls.root / 'dist/ios-use'
         cls.archive = next((cls.root / 'dist').glob('*-source.zip'))
 
     def test_source_and_install_exclude_local_material_without_deleting_it(self):
         with zipfile.ZipFile(self.archive) as archive:
-            entries = {Path(name).relative_to('iphone-use').as_posix() for name in archive.namelist()}
+            entries = {Path(name).relative_to('ios-use').as_posix() for name in archive.namelist()}
         installed = {p.relative_to(self.stage).as_posix() for p in self.stage.rglob('*') if p.is_file()}
         for contents in (entries, installed):
             self.assertFalse(any(p.startswith(('docs/', 'evals/', 'plugins/', 'ui/node_modules/')) for p in contents))
@@ -74,9 +74,9 @@ class PackagingTests(unittest.TestCase):
         checkout = Path(self.directory.name) / 'extracted source'
         with zipfile.ZipFile(self.archive) as archive:
             archive.extractall(checkout)
-        source_root = checkout / 'iphone-use'
+        source_root = checkout / 'ios-use'
         subprocess.run([sys.executable, str(source_root / 'scripts/package.py'), '--stage-only'], check=True, capture_output=True, text=True)
-        rebuilt = source_root / 'dist/iphone-use'
+        rebuilt = source_root / 'dist/ios-use'
         expected = {p.relative_to(self.stage): p.read_bytes() for p in self.stage.rglob('*') if p.is_file()}
         actual = {p.relative_to(rebuilt): p.read_bytes() for p in rebuilt.rglob('*') if p.is_file()}
         self.assertEqual(actual, expected)

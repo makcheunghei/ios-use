@@ -124,7 +124,7 @@ class HostTextTests(unittest.TestCase):
         page = mcp_server.iphone_use.SCREEN_URI
         for line in ('{"jsonrpc":"2.0","id":1,"method":"resources/read","params":{"uri":"%s"}}\n' % page,
                      '{"jsonrpc":"2.0","id":2,"method":"resources/read","params":{"uri":"%sx/1"}}\n' % host_text.FRAME_URI,
-                     '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"ui://iphone-use/action/home"}}\n',
+                     '{"jsonrpc":"2.0","id":3,"method":"resources/read","params":{"uri":"ui://ios-use/action/home"}}\n',
                      '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"pua_tap","arguments":{"x":1,"y":1}}}\n',
                      '{"jsonrpc":"2.0","method":"resources/read","params":{"uri":"%s1/1"}}\n' % host_text.FRAME_URI,
                      "not json\n", "[1]\n"):
@@ -165,7 +165,7 @@ class HostTextTests(unittest.TestCase):
         self.assertEqual(host_text.rewrite("new upstream wording", [("old wording", "x")], strict=False), "new upstream wording")
 
     def test_analytics_stays_on_only_when_asked(self):
-        directory = Path("/tmp/wb/mcp-servers/iphone-use")
+        directory = Path("/tmp/wb/mcp-servers/ios-use")
         self.assertEqual(installer.server_entry(directory, "/usr/bin/python3", analytics=False)["env"]["IPHONE_USE_ANALYTICS"], "0")
         self.assertNotIn("IPHONE_USE_ANALYTICS", installer.server_entry(directory, "/usr/bin/python3", analytics=True)["env"])
 
@@ -368,7 +368,7 @@ class InstallTests(unittest.TestCase):
         self.home = Path(directory.name).resolve()
         self.config = self.home / "mcp.json"
         self.config.write_text(json.dumps({"mcpServers": {"other": self.OTHER}}))
-        self.install_dir = self.home / "mcp-servers/iphone-use"
+        self.install_dir = self.home / "mcp-servers/ios-use"
 
     def install(self, **options):
         return installer.install(self.home, sys.executable, **options)
@@ -382,7 +382,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual((result["version"], result["tools"]), (manifest["version"], 20))
         servers = json.loads(self.config.read_text())["mcpServers"]
         self.assertEqual(servers["other"], self.OTHER)
-        entry = servers["iphone_use"]
+        entry = servers["ios_use"]
         self.assertEqual(entry["args"], [str(self.install_dir / "workbuddy/mcp_server.py")])
         self.assertTrue(Path(entry["command"]).is_absolute())
         self.assertTrue(set(installer.SYSTEM_PATH) <= set(entry["env"]["PATH"].split(os.pathsep)))
@@ -412,7 +412,7 @@ class InstallTests(unittest.TestCase):
     def test_install_ships_the_runtime_without_codex_manifests(self):
         self.install()
         for name in ("server/iphone_use.py", "server/posthog.json", "tooling/forward.mjs", "assets/phone-screen.html",
-                     "skills/iphone-use/references/apps.json", "scripts/phone.py", "workbuddy/host_text.py", installer.MARKER):
+                     "skills/ios-use/references/apps.json", "scripts/phone.py", "workbuddy/host_text.py", installer.MARKER):
             self.assertTrue((self.install_dir / name).is_file(), name)
         for name in installer.CODEX_ONLY + ("workbuddy/install.py", "tests"):
             self.assertFalse((self.install_dir / name).exists(), name)
@@ -425,11 +425,11 @@ class InstallTests(unittest.TestCase):
             self.assertRegex(skill, rf"(?m)^name: {name}$")
             self.assertIn("## 在 WorkBuddy 中使用", skill)
             self.assertIn("AskUserQuestion", skill)
-        references = self.home / "skills/iphone-use/references"
+        references = self.home / "skills/ios-use/references"
         self.assertIn("AskUserQuestion", (references / "authentication.md").read_text())
-        self.assertIn("~/.workbuddy/mcp-servers/iphone-use", (references / "tool-fallback.md").read_text())
+        self.assertIn("~/.workbuddy/mcp-servers/ios-use", (references / "tool-fallback.md").read_text())
         # The setup skill links into the other skill's references.
-        self.assertTrue((self.home / "skills/iphone-use-setup/../iphone-use/references/authentication.md").is_file())
+        self.assertTrue((self.home / "skills/ios-use-setup/../ios-use/references/authentication.md").is_file())
 
     def test_reinstall_changes_nothing_and_keeps_one_backup(self):
         self.assertTrue(self.install()["config_changed"])
@@ -438,20 +438,20 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(self.config.read_text(), before)
         self.assertEqual(len(self.backups()), 1)
         self.assertEqual(json.loads(self.backups()[0].read_text()), {"mcpServers": {"other": self.OTHER}})
-        self.assertEqual([p.name for p in (self.home / "mcp-servers").iterdir()], ["iphone-use"])
+        self.assertEqual([p.name for p in (self.home / "mcp-servers").iterdir()], ["ios-use"])
 
     def test_someone_elses_server_entry_is_kept_unless_forced(self):
-        foreign = {"mcpServers": {"iphone_use": {"command": "python3", "args": ["/elsewhere/server/iphone_use.py"]}}}
+        foreign = {"mcpServers": {"ios_use": {"command": "python3", "args": ["/elsewhere/server/iphone_use.py"]}}}
         self.config.write_text(json.dumps(foreign))
         with self.assertRaises(installer.InstallError):
             self.install()
         self.assertEqual(json.loads(self.config.read_text()), foreign)
         self.assertFalse(self.install_dir.exists())
         self.install(force=True)
-        self.assertTrue(installer.ours(json.loads(self.config.read_text())["mcpServers"]["iphone_use"], self.install_dir))
+        self.assertTrue(installer.ours(json.loads(self.config.read_text())["mcpServers"]["ios_use"], self.install_dir))
 
     def test_someone_elses_skill_directory_is_kept(self):
-        skill = self.home / "skills/iphone-use"
+        skill = self.home / "skills/ios-use"
         skill.mkdir(parents=True)
         (skill / "SKILL.md").write_text("---\nname: something-else\n---\n")
         with self.assertRaises(installer.InstallError):
@@ -469,7 +469,7 @@ class InstallTests(unittest.TestCase):
     def test_missing_config_is_created(self):
         self.config.unlink()
         self.install()
-        self.assertEqual(list(json.loads(self.config.read_text())["mcpServers"]), ["iphone_use"])
+        self.assertEqual(list(json.loads(self.config.read_text())["mcpServers"]), ["ios_use"])
         self.assertEqual(self.backups(), [])
 
     def test_uninstall_removes_only_this_install(self):
@@ -516,7 +516,7 @@ class DetachedWorkerTests(unittest.TestCase):
     """Upstream's own job code, adapted, with this process in the place of the MCP server."""
 
     def setUp(self):
-        directory = tempfile.TemporaryDirectory(prefix="iphone-use-worker-")
+        directory = tempfile.TemporaryDirectory(prefix="ios-use-worker-")
         self.addCleanup(directory.cleanup)
         home = Path(directory.name).resolve()
         # Upstream only accepts a worker whose entrypoint carries its own file name.

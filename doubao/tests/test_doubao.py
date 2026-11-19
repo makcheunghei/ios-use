@@ -60,7 +60,7 @@ class TextTests(unittest.TestCase):
         mcp_stdio.adapt(upstream)
         views = {tool["name"]: tool["_meta"]["ui"]["resourceUri"] for tool in upstream.TOOLS if tool.get("_meta", {}).get("ui", {}).get("resourceUri")}
         self.assertEqual(views, {"pua_screen": upstream.SCREEN_URI})
-        self.assertRegex(upstream.SCREEN_URI, r"^ui://iphone-use/phone-[\d.]+-doubao-[0-9a-f]{8}\.html$")
+        self.assertRegex(upstream.SCREEN_URI, r"^ui://ios-use/phone-[\d.]+-doubao-[0-9a-f]{8}\.html$")
         self.assertEqual(upstream.SCREEN_META["ui"]["csp"]["connectDomains"], [])
 
     def test_phone_is_asked_for_thirty_half_size_frames_and_its_service_outlives_the_server(self):
@@ -90,9 +90,9 @@ class TextTests(unittest.TestCase):
             text = doubao_text.skill_text(relative, path.read_text())
             for word in OTHER_TOOLS:
                 self.assertNotIn(word, text, relative)
-        skill = doubao_text.skill_text("skills/iphone-use/SKILL.md", (ROOT / "skills/iphone-use/SKILL.md").read_text())
-        self.assertRegex(skill, r"\A---\nname: iphone-use\ndescription: 用户要在手机 / iPhone 上")
-        self.assertIn("mcp__iphone_use__pua_", skill)
+        skill = doubao_text.skill_text("skills/ios-use/SKILL.md", (ROOT / "skills/ios-use/SKILL.md").read_text())
+        self.assertRegex(skill, r"\A---\nname: ios-use\ndescription: 用户要在手机 / iPhone 上")
+        self.assertIn("mcp__ios_use__pua_", skill)
 
     def test_a_list_out_of_step_with_workbuddys_is_reported(self):
         with self.assertRaises(doubao_text.Drift):
@@ -202,14 +202,14 @@ class InstallTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory(prefix="doubao install ")
         self.addCleanup(directory.cleanup)
-        self.install_dir = Path(directory.name).resolve() / "iphone-use-doubao"
+        self.install_dir = Path(directory.name).resolve() / "ios-use-doubao"
 
     def test_install_prepares_a_server_that_starts_under_a_bare_path(self):
         result = installer.install(self.install_dir, sys.executable)
         manifest = json.loads((ROOT / "plugin.json").read_text())
         self.assertEqual((result["version"], result["tools"]), (manifest["version"], 20))
         entry = self.install_dir / "doubao/mcp_stdio.py"
-        self.assertEqual(result["connector"], {"服务器名称": "iphone_use", "传输类型": "STDIO", "命令": sys.executable, "参数": [str(entry)]})
+        self.assertEqual(result["connector"], {"服务器名称": "ios_use", "传输类型": "STDIO", "命令": sys.executable, "参数": [str(entry)]})
         found = json.loads((self.install_dir / "doubao/host.json").read_text())
         self.assertTrue(set(installer.shared.SYSTEM_PATH) <= set(found["path"]))
         self.assertEqual(found["env"], {"NO_PROXY": "127.0.0.1,localhost,::1", "no_proxy": "127.0.0.1,localhost,::1", "IPHONE_USE_ANALYTICS": "0"})
@@ -228,7 +228,7 @@ class InstallTests(unittest.TestCase):
         for name in installer.shared.CODEX_ONLY + ("doubao/install.py", "workbuddy/install.py", "tests"):
             self.assertFalse((self.install_dir / name).exists(), name)
         self.assertIn(doubao_text.SCREEN_SCRIPT, (self.install_dir / installer.shared.SCREEN_PAGE).read_text())
-        self.assertEqual(result["skills"], [str(self.install_dir / "skills/iphone-use"), str(self.install_dir / "skills/iphone-use-setup")])
+        self.assertEqual(result["skills"], [str(self.install_dir / "skills/ios-use"), str(self.install_dir / "skills/ios-use-setup")])
         for directory in map(Path, result["skills"]):
             skill = (directory / "SKILL.md").read_text()
             # What Doubao Work's upload asks of a skill folder, and this host's wording inside it.

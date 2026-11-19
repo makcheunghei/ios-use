@@ -1,4 +1,4 @@
-# iPhone Use analytics
+# iOS Use analytics
 
 PostHog organization: `iPhone-use`. Project: `653022` (US Cloud).
 Project time zone: `Asia/Shanghai`.
@@ -33,7 +33,7 @@ DO_NOT_TRACK=1
 ```
 
 For Codex, add `IPHONE_USE_ANALYTICS = "0"` under
-`[mcp_servers.iphone_use.env]` in `~/.codex/config.toml`. For a portable MCP JSON
+`[mcp_servers.ios_use.env]` in `~/.codex/config.toml`. For a portable MCP JSON
 configuration, add `"env": {"IPHONE_USE_ANALYTICS": "0"}` to the server entry.
 
 `IPHONE_USE_POSTHOG_PROJECT_TOKEN` overrides the bundled token. An explicitly

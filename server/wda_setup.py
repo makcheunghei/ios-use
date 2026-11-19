@@ -35,7 +35,7 @@ WDA_COMMIT = "717f2ef78791b512db80f81d9a73ff5be321ea57"
 WDA_VERSION = "17.0.12"
 WDA_REPOSITORY = "https://github.com/appium/appium-ios.git"
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_STATE = Path.home() / ".local/share/iphone-use"
+DEFAULT_STATE = Path.home() / ".local/share/ios-use"
 
 
 def state_directory(explicit=None):
@@ -43,10 +43,12 @@ def state_directory(explicit=None):
     configured = explicit or os.environ.get("IPHONE_USE_STATE_DIR") or os.environ.get("WDA_STATE_DIR")
     if configured:
         return Path(configured).expanduser()
-    current = Path.home() / ".local/share/iphone-use"
-    previous = Path.home() / ".local/share/iphone-use-wda"
-    if not current.exists() and (previous / "config.json").is_file():
-        return previous
+    current = Path.home() / ".local/share/ios-use"
+    if not current.exists():
+        for name in ("iphone-use", "iphone-use-wda"):
+            previous = current.with_name(name)
+            if (previous / "config.json").is_file() or any(previous.glob("devices/*/config.json")):
+                return previous
     return current
 ACTIVE_STATES = {"queued", "running"}
 RECOVERY_COOLDOWN_SECONDS = 120

@@ -22,7 +22,7 @@ class RegistrationTests(unittest.TestCase):
         self.root=Path(self.directory.name).resolve()
         (self.root/"server").mkdir()
         (self.root/"server/iphone_use.py").write_text("# synthetic entrypoint\n")
-        self.installation={"pluginId":"iphone-use@iphone-use-local","installedPath":str(self.root),"version":"0.1.6"}
+        self.installation={"pluginId":"ios-use@ios-use-local","installedPath":str(self.root),"version":"0.1.6"}
         self.config_home = self.root / "codex"
         self.config_home.mkdir()
         env = patch.dict(registration.os.environ, {"CODEX_HOME": str(self.config_home)})
@@ -37,8 +37,9 @@ class RegistrationTests(unittest.TestCase):
         with patch.object(registration.subprocess,"run") as run:
             self.invoke(self.installation)
         self.assertEqual(run.call_args_list, [
-            call(["codex","mcp","add","iphone_use","--","python3",str(self.root/"server/iphone_use.py")],check=True),
-            call(["codex","mcp","get","iphone_wda","--json"],capture_output=True,text=True,check=False)])
+            call(["codex","mcp","add","ios_use","--","python3",str(self.root/"server/iphone_use.py")],check=True),
+            call(["codex","mcp","get","iphone_wda","--json"],capture_output=True,text=True,check=False),
+            call(["codex","mcp","get","iphone_use","--json"],capture_output=True,text=True,check=False)])
 
     def test_upgrade_removes_only_owned_mcp_and_disables_previous_plugin_preserving_other_settings(self):
         config = self.config_home / "config.toml"
@@ -52,14 +53,26 @@ class RegistrationTests(unittest.TestCase):
         run.assert_any_call(["codex","mcp","remove","iphone_wda"],check=True)
         self.assertEqual(config.read_text(), original.replace('enabled = true', 'enabled = false', 1))
         self.assertEqual(config.stat().st_mode & 0o777, 0o600)
-        self.assertFalse(list(self.config_home.glob('.iphone-use-config-*')))
+        self.assertFalse(list(self.config_home.glob('.ios-use-config-*')))
+
+    def test_rename_retires_the_iphone_use_registration_and_embedded_plugin(self):
+        config = self.config_home / "config.toml"
+        config.write_text('[plugins."iphone-use@iphone-use-local"]\nenabled = true\n')
+        path = self.root / "cache/iphone-use-local/iphone-use/0.4.0/server/iphone_use.py"
+        old = {"transport":{"type":"stdio","args":[str(path)]}}
+        with patch.object(registration.subprocess,"run",return_value=Mock(returncode=0,stdout=json.dumps(old))) as run:
+            registration.retire_previous_registration()
+        run.assert_any_call(["codex","mcp","remove","iphone_use"],check=True)
+        self.assertIn("enabled = false",config.read_text())
 
     def test_unrelated_mcp_is_preserved_and_absent_or_malformed_previous_entry_is_harmless(self):
         for response in [Mock(returncode=1,stdout=''), Mock(returncode=0,stdout='invalid'),
                          Mock(returncode=0,stdout=json.dumps({"transport":{"type":"stdio","args":["/custom/server.py"]}}))]:
             with self.subTest(response=response), patch.object(registration.subprocess,"run",return_value=response) as run:
                 registration.retire_previous_registration()
-            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args_list, [
+                call(["codex","mcp","get",name,"--json"],capture_output=True,text=True,check=False)
+                for name in ("iphone_wda","iphone_use")])
 
     def test_wrong_plugin_and_missing_entrypoint_do_not_change_config(self):
         for data in ({**self.installation,"pluginId":"unrelated-plugin@example"},self.installation):
