@@ -2,7 +2,7 @@ import { App } from '@modelcontextprotocol/ext-apps';
 
 type Size = { width: number; height: number };
 type Point = { x: number; y: number };
-type Frame = Size & { seq: number; data: string; mimeType: string };
+type Frame = Size & { seq: number; geometry?: string; data: string; mimeType: string };
 type Gesture = {
   id: number;
   kind: 'tap' | 'drag';
@@ -15,6 +15,7 @@ type Gesture = {
 };
 type Preview = {
   server_time: number;
+  device_id?: string;
   stream_id?: string;
   frame: Frame | null;
   frame_available?: boolean;
@@ -51,7 +52,7 @@ const tools: Record<ToolName, HTMLButtonElement> = {
   screenshot: document.getElementById('tool-screenshot') as HTMLButtonElement,
 };
 const app = new App(
-  { name: 'iPad Use Screen', version: '0.3.12' },
+  { name: 'iPad Use Screen', version: '0.4.0' },
   { availableDisplayModes: ['fullscreen'] },
   { autoResize: false },
 );
@@ -60,6 +61,10 @@ let ready = false;
 let disposed = false;
 let inFlight = false;
 let frameSeq = 0;
+let toolContextReceived = false;
+let deviceId: string | undefined;
+let geometry: string | undefined;
+const targetDevice = () => deviceId ? { device: deviceId } : {};
 let frameGeneration = 0;
 let streamId: string | undefined;
 let eventId = 0;
@@ -120,9 +125,9 @@ const validPoint = (value: unknown): value is Point => {
 
 function syncTools() {
   const paused = root.dataset.live === 'paused';
-  tools.refresh.disabled = acting;
+  tools.refresh.disabled = acting || !toolContextReceived;
   // While the user authenticates on the phone nothing is captured or sent from here.
-  tools.home.disabled = tools.screenshot.disabled = acting || paused;
+  tools.home.disabled = tools.screenshot.disabled = acting || paused || !toolContextReceived;
 }
 
 function showEmpty(state: EmptyState) {
@@ -319,6 +324,7 @@ function showGesture(gesture: Gesture) {
 function consume(value: unknown) {
   if (disposed || !value || typeof value !== 'object') return;
   const preview = value as Partial<Preview>;
+  if (preview.device_id && deviceId && preview.device_id !== deviceId) return;
   let nextAppearance = deviceAppearance;
   if (typeof preview.service_ready === 'boolean') serviceUnavailable = !preview.service_ready;
   if (typeof preview.stream_id === 'string' && preview.stream_id !== streamId) {
@@ -383,6 +389,11 @@ function consume(value: unknown) {
   if (frame && validSize(frame) && Number.isInteger(frame.seq) && frame.seq > frameSeq
       && typeof frame.data === 'string' && frame.data.length > 0
       && ['image/jpeg', 'image/png', 'image/webp'].includes(frame.mimeType)) {
+    if (frame.geometry !== geometry) {
+      cancelPointer();
+      frameGeneration++;
+      geometry = frame.geometry;
+    }
     frameSeq = frame.seq;
     serviceUnavailable = false;
     root.dataset.frameSeq = String(frame.seq);
@@ -432,7 +443,7 @@ function schedule(delay: number) {
 }
 
 async function poll() {
-  if (!visible() || inFlight) return;
+  if (!visible() || inFlight || !toolContextReceived) return;
   inFlight = true;
   const started = performance.now();
   let nextDelay = FRAME_INTERVAL;
@@ -442,7 +453,7 @@ async function poll() {
     const generation = frameGeneration;
     const result = await app.callServerTool({
       name: 'pua_screen_frame',
-      arguments: { after_seq: frameSeq, last_event_id: eventId },
+      arguments: { ...targetDevice(), after_seq: frameSeq, last_event_id: eventId },
     }, { timeout: REQUEST_TIMEOUT });
     if (!visible() || generation !== frameGeneration) return;
     if (result.isError) throw new Error('preview unavailable');
@@ -464,7 +475,8 @@ async function poll() {
 }
 
 async function act(name: ToolName) {
-  if (acting || disposed || tools[name].disabled) return;
+  if (!toolContextReceived || acting || disposed || tools[name].disabled) return;
+  const target = deviceId;
   const previousEmptyState = emptyState.dataset.state as EmptyState;
   if (name === 'refresh') {
     frameGeneration++; // Ignore a poll from before this reconnect click.
@@ -475,10 +487,12 @@ async function act(name: ToolName) {
   syncTools();
   try {
     if (!ready) await connect();
+    if (target !== deviceId) return;
     const result = await app.callServerTool({
       name: 'pua_screen_action',
-      arguments: { action: name },
+      arguments: { ...targetDevice(), action: name },
     }, { timeout: ACTION_TIMEOUT });
+    if (target !== deviceId) return;
     const data = result.structuredContent as (Partial<Preview> & { service_ready?: boolean; error?: { code?: string } }) | undefined;
     if (result.isError || data?.error) {
       if (name === 'refresh' && !image.src) showEmpty(previousEmptyState);
@@ -504,13 +518,13 @@ async function act(name: ToolName) {
 let decodedAt = -Infinity;
 let freshUntil = -Infinity;
 let failedFrame = false;
-type PointerStart = { id: number; point: Point; client: Point; at: number; generation: number; stream?: string; size: Size; moved: boolean };
+type PointerStart = { bounds: DOMRect; id: number; point: Point; client: Point; at: number; generation: number; stream?: string; size: Size; moved: boolean };
 let pointer: PointerStart | undefined;
 let viewportRetryAt = -Infinity;
 async function recoverViewport() {
   if (!visible() || acting || root.dataset.live !== 'live' || root.dataset.inputBusy === 'true'
-      || !validSize(dimensions) || !validSize(viewport)
-      || Math.abs(dimensions.width / dimensions.height - viewport.width / viewport.height) < .01
+      || !validSize(dimensions)
+      || (validSize(viewport) && Math.abs(dimensions.width / dimensions.height - viewport.width / viewport.height) < .01)
       || performance.now() < viewportRetryAt) return;
   // A rotated MJPEG frame can arrive without any phone tool updating the cached viewport.
   // Refresh only on mismatch; failures are throttled and never replay a gesture.
@@ -518,7 +532,7 @@ async function recoverViewport() {
   const generation = frameGeneration, stream = streamId;
   try {
     const result = await app.callServerTool({
-      name: 'pua_screen_action', arguments: { action: 'viewport' },
+      name: 'pua_screen_action', arguments: { ...targetDevice(), action: 'viewport' },
     }, { timeout: ACTION_TIMEOUT });
     const data = result.structuredContent as Partial<Preview> | undefined;
     if (visible() && generation === frameGeneration && stream === streamId
@@ -526,7 +540,7 @@ async function recoverViewport() {
   } catch { /* Keep input disabled until geometry can be verified by a later poll. */ }
 }
 function canPoint() {
-  return visible() && !acting && root.dataset.live === 'live' && root.dataset.inputBusy !== 'true'
+  return !!geometry && visible() && !acting && root.dataset.live === 'live' && root.dataset.inputBusy !== 'true'
     && !failedFrame && !image.hidden && !!image.src && validSize(viewport) && validSize(dimensions)
     && Number.isFinite(decodedAt) && performance.now() < freshUntil
     && Math.abs(dimensions.width / dimensions.height - viewport.width / viewport.height) < .01;
@@ -552,7 +566,7 @@ function pointerDown(event: PointerEvent) {
   const point = pointerPoint(event);
   if (!point || !viewport) return;
   event.preventDefault();
-  pointer = { id: event.pointerId, point, client: { x: event.clientX, y: event.clientY },
+  pointer = { bounds: screen.getBoundingClientRect(), id: event.pointerId, point, client: { x: event.clientX, y: event.clientY },
     at: performance.now(), generation: frameGeneration, stream: streamId, size: { ...viewport }, moved: false };
   screen.setPointerCapture(event.pointerId);
 }
@@ -565,6 +579,9 @@ function pointerUp(event: PointerEvent) {
   pointerMove(event);
   const end = pointerPoint(event);
   cancelPointer();
+  const bounds = screen.getBoundingClientRect();
+  if (bounds.left !== start.bounds.left || bounds.top !== start.bounds.top
+      || bounds.width !== start.bounds.width || bounds.height !== start.bounds.height) return;
   if (!end || !canPoint() || start.generation !== frameGeneration || start.stream !== streamId
       || start.size.width !== viewport?.width || start.size.height !== viewport?.height) return;
   // Long presses and looped drags are deliberately not converted into surprise taps.
@@ -578,7 +595,7 @@ async function sendPointer(args: Record<string, string | number>) {
   acting = true;
   syncTools();
   try {
-    const result = await app.callServerTool({ name: 'pua_screen_action', arguments: args }, { timeout: ACTION_TIMEOUT });
+    const result = await app.callServerTool({ name: 'pua_screen_action', arguments: { ...targetDevice(), ...args, geometry } }, { timeout: ACTION_TIMEOUT });
     const data = result.structuredContent as { error?: { code?: string; uncertain?: boolean } } | undefined;
     if (result.isError || data?.error) notify(data?.error?.uncertain ? '操作结果不确定，请查看 iPad 后再操作' : FAILED[data?.error?.code ?? ''] ?? '操作未完成，请查看 iPad 状态', true);
   } catch {
@@ -712,7 +729,28 @@ function dispose() {
 }
 
 app.ontoolresult = (result) => {
-  if (!result.isError) consume(result.structuredContent);
+  if (result.isError) return;
+  const data = result.structuredContent as Partial<Preview> | undefined;
+  let target = data?.device_id;
+  if (!data) {
+    const block = result.content?.find(item => item.type === 'text');
+    if (block?.type === 'text') {
+      try { target = JSON.parse(block.text).device_id; } catch { return; }
+    }
+  }
+  if (target !== deviceId) {
+    clearFrame();
+    viewport = undefined;
+    geometry = undefined;
+    streamId = undefined;
+    eventId = 0;
+    viewportRetryAt = -Infinity;
+    cancelPointer();
+  }
+  deviceId = target;
+  toolContextReceived = true;
+  syncTools();
+  consume(data);
   schedule(0);
 };
 app.onhostcontextchanged = (context) => { applyTheme(context?.theme); };

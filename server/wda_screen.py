@@ -1,7 +1,7 @@
 """Memory-only WDA MJPEG preview and a small, private cross-process activity bus.
 
 The widget supplies a short lease. No visible widget means no USB capture; opening
-the tool returns immediately. This module never calls the WDA command channel.
+the tool returns immediately. Rotation sampling uses a separate read-only connection while a viewer is active.
 """
 from __future__ import annotations
 
@@ -22,6 +22,8 @@ import threading
 import time
 import uuid
 
+from wda_client import WDAClient, WDAError
+
 MAX_FRAME_BYTES = 4 * 1024 * 1024
 FRAME_LEASE_SECONDS = 5
 EVENT_AGE_MS = 10_000
@@ -31,8 +33,30 @@ SOF_MARKERS = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7,
                0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
 
 
-def jpeg_dimensions(raw):
-    """Read JPEG SOF dimensions without decoding pixels or trusting HTTP headers."""
+def exif_orientation(segment):
+    """Read the inline SHORT orientation tag in TIFF IFD0 (JPEG APP1)."""
+    if not segment.startswith(b"Exif\0\0"):
+        return None
+    tiff = memoryview(segment)[6:]
+    order = {b"II": "little", b"MM": "big"}.get(bytes(tiff[:2]))
+    if not order or len(tiff) < 8 or int.from_bytes(tiff[2:4], order) != 42:
+        return None
+    offset = int.from_bytes(tiff[4:8], order)
+    if not 8 <= offset <= len(tiff) - 2:
+        return None
+    count = int.from_bytes(tiff[offset:offset + 2], order)
+    start = offset + 2
+    for pos in range(start, min(start + 12 * count, len(tiff) - 11), 12):
+        tag = tiff[pos:pos + 12]
+        if (int.from_bytes(tag[:2], order) == 274 and int.from_bytes(tag[2:4], order) == 3
+                and int.from_bytes(tag[4:8], order) == 1):
+            return int.from_bytes(tag[8:10], order)
+    return None
+
+
+def jpeg_header(raw):
+    """Read the browser-visible size and orientation without decoding pixels."""
+    orientation = None
     if not raw.startswith(b"\xff\xd8"):
         return None
     offset = 2
@@ -54,14 +78,24 @@ def jpeg_dimensions(raw):
         length = int.from_bytes(raw[offset:offset + 2], "big")
         if length < 2 or offset + length > len(raw):
             return None
+        if marker == 0xE1 and orientation is None:
+            orientation = exif_orientation(raw[offset + 2:offset + length])
         if marker in SOF_MARKERS:
             if length < 8:
                 return None
             height = int.from_bytes(raw[offset + 3:offset + 5], "big")
             width = int.from_bytes(raw[offset + 5:offset + 7], "big")
-            return (width, height) if 0 < width <= 16384 and 0 < height <= 16384 else None
+            if not (0 < width <= 16384 and 0 < height <= 16384):
+                return None
+            size = (height, width) if orientation in (5, 6, 7, 8) else (width, height)
+            return size, orientation
         offset += length
     return None
+
+
+def jpeg_dimensions(raw):
+    header = jpeg_header(raw)
+    return header[0] if header else None
 
 
 class MJPEGParser:
@@ -70,7 +104,7 @@ class MJPEGParser:
         self.max_bytes = max_bytes
         self.buffer = bytearray()
 
-    def feed(self, data):
+    def feed(self, data, with_orientation=False):
         frames = []
         incoming = memoryview(data)
         while incoming:
@@ -93,9 +127,9 @@ class MJPEGParser:
                     break
                 raw = bytes(self.buffer[:end + 2])
                 del self.buffer[:end + 2]
-                dimensions = jpeg_dimensions(raw)
-                if dimensions:
-                    frames.append((raw, dimensions))
+                header = jpeg_header(raw)
+                if header:
+                    frames.append((raw, header if with_orientation else header[0]))
         return frames
 
 
@@ -249,6 +283,7 @@ class ScreenHub:
                 wire_frame = None
             return {"server_time": self._now(), "frame": wire_frame,
                     "stream_id": self._stream_id, "device": self.device,
+                    "geometry": self._frame.get("geometry") if self._frame and not state["paused"] else None,
                     "frame_available": self._frame is not None and not state["paused"],
                     "frame_age_ms": max(0, int((time.monotonic()-self._received_at)*1000)) if self._received_at is not None else None,
                     "viewport": state["viewport"],
@@ -396,16 +431,16 @@ class ScreenHub:
         # Runs for every stream chunk: only the pause flag is needed here.
         return lease_live and not stop.is_set() and not self._paused()
 
-    def _publish_frame(self, raw, width, height, stop):
+    def _publish_frame(self, raw, width, height, stop, geometry=None):
         with self._lock:
             # A close/pause racing the read must not repopulate cleared pixels.
             if stop.is_set():
                 return
             self._received_at = time.monotonic()
-            if self._frame and self._frame.get("_jpeg") == raw:
+            if self._frame and self._frame.get("_jpeg") == raw and self._frame.get("geometry") == geometry:
                 return
             self._seq += 1
-            self._frame = {"seq": self._seq, "_jpeg": raw,
+            self._frame = {"seq": self._seq, "_jpeg": raw, "geometry": geometry,
                            "mimeType": "image/jpeg", "width": width, "height": height}
 
     def _command(self):
@@ -460,7 +495,7 @@ class ScreenHub:
     def _run(self, stop):
         backoff = 0.5
         while self._live(stop):
-            child = None
+            child = geometry_client = None
             received = False
             try:
                 command = self._command()
@@ -469,23 +504,53 @@ class ScreenHub:
                                              stderr=subprocess.DEVNULL, bufsize=0)
                     with self._lock:
                         self._child = child
+                    config_path = self.state_dir / "config.json"
+                    if config_path.is_file():
+                        port = json.loads(config_path.read_text()).get("local_port", 18100)
+                        geometry_client = WDAClient(f"http://127.0.0.1:{port}", timeout=1)
+                    orientation = geometry = frame_size = None
+                    next_sample = 0
                     parser = MJPEGParser()
                     while self._live(stop) and child.poll() is None:
                         ready, _, _ = select.select([child.stdout], [], [], 0.1)
                         if not ready:
                             continue
+                        if geometry_client and time.monotonic() >= next_sample:
+                            try:
+                                sample = geometry_client.request("GET", "/rotation").get("value")
+                                angle = sample.get("z") if isinstance(sample,dict) else None
+                            except WDAError:
+                                angle = None
+                            if angle != orientation or not next_sample:
+                                orientation = angle
+                                geometry = (f"{uuid.uuid4().hex}:{angle}" if angle in (0,90,180,270) else None)
+                                with self._lock:
+                                    self._frame = None
+                                # Discard bytes buffered across a detected orientation change.
+                                if next_sample:
+                                    break
+                            next_sample = time.monotonic() + .75
                         chunk = os.read(child.stdout.fileno(), 65536)
                         if not chunk:
                             break
-                        for raw, (width, height) in parser.feed(chunk):
+                        for raw, ((width, height), exif) in parser.feed(chunk, with_orientation=True):
+                            frame_angle = {3: 180, 6: 90, 8: 270}.get(exif)
+                            if frame_angle is not None and orientation is not None and frame_angle != orientation:
+                                continue
                             if not self._live(stop):
                                 break
-                            self._publish_frame(raw, width, height, stop)
+                            if frame_size != (width,height):
+                                frame_size = width,height
+                                if geometry:
+                                    geometry = f"{uuid.uuid4().hex}:{orientation}"
+                            self._publish_frame(raw, width, height, stop, geometry)
                             received = True
             except (OSError, ValueError):
                 # Keep the last frame through a transient device/stream gap.
                 pass
             finally:
+                if geometry_client is not None:
+                    geometry_client.close()
                 self._terminate(child)
                 with self._lock:
                     if self._child is child:

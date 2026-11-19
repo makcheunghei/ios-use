@@ -481,7 +481,11 @@ class CoordinateFallbackTests(PhoneCase):
         self.assertNotIn("next_arguments", error.details["recovery"])
         result = self.phone.tap(x=195, y=222)
         self.assertTrue(result["action_executed"])
-        self.assertEqual(self.client.actions(), [("POST", "/wda/tap", {"x": 195, "y": 222})])
+        self.assertEqual(len(self.client.actions()), 1)
+        method, path, payload = self.client.actions()[0]
+        self.assertEqual((method,path), ("POST","/actions"))
+        move = payload["actions"][0]["actions"][0]
+        self.assertEqual((move["x"],move["y"]), (195,222))
 
     def test_screen_capture_failure_never_hides_the_selector_error(self):
         self.client.elements.clear()

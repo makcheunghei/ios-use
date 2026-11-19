@@ -147,7 +147,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(responses[1]["result"], {})
         tools = responses[2]["result"]["tools"]
         names = [tool["name"] for tool in tools]
-        self.assertEqual(len(names), 19)
+        self.assertEqual(len(names), 20)
         self.assertEqual(len(names), len(set(names)))
         for name in ("pua_ready", "pua_setup", "pua_observe", "pua_tap", "pua_type_text", "pua_batch", "pua_collect_list", "pua_apps"):
             self.assertIn(name, names)
@@ -185,8 +185,10 @@ class ProtocolTests(unittest.TestCase):
         for step in batch_steps:
             op = step["properties"]["op"]["const"]
             standalone = tools["pua_" + op]["inputSchema"]
+            expected = contract(standalone, standalone.get("$defs", {}))
+            expected["properties"].pop("device")
             self.assertEqual(contract(step["properties"]["args"], tools["pua_batch"]["inputSchema"]["$defs"]),
-                             contract(standalone, standalone.get("$defs", {})))
+                             expected)
 
     def test_stdio_apps_catalog_returns_public_evidence_without_wda_access(self):
         responses = self.exchange([
@@ -418,7 +420,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_coordinates_and_custom_region_accept_no_observation_id(self):
         for name, arguments, expected_path in (
-            ("pua_tap", {"x": 10, "y": 200}, "/wda/tap"),
+            ("pua_tap", {"x": 10, "y": 200}, "/actions"),
             ("pua_swipe", {"region": {"x": 50, "y": 200, "width": 200, "height": 200}}, "/wda/dragfromtoforduration"),
         ):
             with self.subTest(name=name):
@@ -513,7 +515,7 @@ class ProtocolTests(unittest.TestCase):
         with patch.object(runtime.setup_manager, "mirroring_running", return_value=True), self.assertRaises(WDAError) as caught:
             runtime.call("pua_ready", {"screenshot": False})
         self.assertEqual(caught.exception.code, "mirroring_conflict")
-        self.assertFalse(any(path in ("/wda/tap", "/wda/keys") for _, path, _ in client.actions()))
+        self.assertFalse(any(path in ("/actions", "/wda/keys") for _, path, _ in client.actions()))
 
     def test_ready_nonempty_tree_proves_unlocked_usable_phone(self):
         runtime, client = self.runtime()

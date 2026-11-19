@@ -26,7 +26,7 @@ class MockScreen:
         self.pause_reason = None
         self.device = None
         self.closed = False
-        self.frame_result = {"frame": {"seq": 7, "data": "preview-only",
+        self.frame_result = {"geometry":"test:0", "frame_age_ms":1, "frame": {"seq": 7, "data": "preview-only",
                                       "mimeType": "image/jpeg", "width": 390, "height": 844},
                              "events": [], "busy": False, "paused": False}
 
@@ -129,7 +129,7 @@ class ScreenProtocolTests(unittest.TestCase):
         ])
         self.assertIn("resources", responses[0]["result"]["capabilities"])
         tools = {item["name"]: item for item in responses[1]["result"]["tools"]}
-        self.assertEqual(len(tools), 19)
+        self.assertEqual(len(tools), 20)
         for name in ("pua_ready", "pua_screen"):
             self.assertEqual(tools[name]["_meta"]["ui"]["resourceUri"], SCREEN_URI)
         self.assertEqual(tools["pua_screen"]["_meta"]["openai/ui"]["entrypoints"], [{"type": "thread"}])
@@ -140,7 +140,7 @@ class ScreenProtocolTests(unittest.TestCase):
         self.assertFalse(tools["pua_screen_action"]["annotations"]["idempotentHint"])
         visible = [item for item in tools.values()
                    if item.get("_meta", {}).get("ui", {}).get("visibility") != ["app"]]
-        self.assertEqual(len(visible), 17)
+        self.assertEqual(len(visible), 18)
         self.assertTrue(tools["pua_screen_frame"]["annotations"]["readOnlyHint"])
 
     def test_stdio_serves_packaged_widget_without_connecting_to_wda(self):
@@ -271,18 +271,31 @@ class ScreenProtocolTests(unittest.TestCase):
         self.assertEqual(screen.events[0], ("begin", {"op": "ready"}))
         self.assertEqual(screen.events[-1], ("end", {"token": "activity-token"}))
 
+    def test_screen_only_ready_reads_one_image_and_no_xml(self):
+        runtime, client, screen = self.runtime()
+        ready = runtime.call("pua_ready", {"screen_only":True})
+        self.assertTrue(ready["proof"]["screenshot_readable"])
+        self.assertFalse(ready["proof"]["source_readable"])
+        self.assertEqual(sum(path == "/screenshot" for _,path,_ in client.calls),1)
+        self.assertFalse(any(path.startswith("/source") for _,path,_ in client.calls))
+        screen.set_paused(True,reason="authentication")
+        client.calls.clear()
+        with self.assertRaises(WDAError):
+            runtime.call("pua_ready", {"screen_only":True})
+        self.assertFalse(any(path == "/screenshot" for _,path,_ in client.calls))
+
     def test_coordinate_tap_emits_actual_point_before_single_action_without_extra_reads(self):
         runtime, client, screen = self.runtime()
         original = client.session
         at_action = []
         def request(method, path, payload=None, timeout=None):
-            if path == "/wda/tap":
+            if path == "/actions":
                 at_action.extend(screen.events)
             return original(method, path, payload, timeout)
         client.session = request
         result = runtime.call("pua_tap", {"x": 120, "y": 240})
         self.assertTrue(result["action_executed"])
-        self.assertEqual([path for _, path, _ in client.calls], ["/wda/locked", "/window/size", "/wda/tap"])
+        self.assertEqual([path for _, path, _ in client.calls], ["/wda/locked", "/window/size", "/actions"])
         self.assertEqual([event for event in at_action if event[0] == "tap"],
                          [("tap", {"point": {"x": 120, "y": 240}, "viewport": client.size})])
         self.assertEqual(screen.events[0], ("begin", {"op": "tap"}))
@@ -346,8 +359,8 @@ class ScreenProtocolTests(unittest.TestCase):
             setattr(screen, method, Mock(side_effect=OSError("display unavailable")))
         result = runtime.call("pua_tap", {"x": 120, "y": 240})
         self.assertTrue(result["action_executed"])
-        self.assertEqual([path for _, path, _ in client.calls], ["/wda/locked", "/window/size", "/wda/tap"])
-        self.assertEqual([path for _, path, _ in client.actions()], ["/wda/tap"])
+        self.assertEqual([path for _, path, _ in client.calls], ["/wda/locked", "/window/size", "/actions"])
+        self.assertEqual([path for _, path, _ in client.actions()], ["/actions"])
 
     def test_ready_preview_failure_cannot_break_channel_readiness(self):
         runtime, client, screen = self.runtime()
@@ -380,10 +393,10 @@ class ScreenProtocolTests(unittest.TestCase):
     def test_pointer_actions_map_exact_points_and_invalidate_model_focus(self):
         runtime, client, screen = self.runtime()
         runtime.phone.pending_input = {"token": "old"}
-        args = dict(action="tap", x=100, y=200, width=390, height=844)
+        args = dict(action="tap", x=100, y=200, width=390, height=844, geometry="test:0")
         self.assertTrue(runtime.call("pua_screen_action", args)["ok"])
         self.assertEqual(client.actions()[-1], ("POST", "/actions", {"actions":[{
-            "type":"pointer","id":"preview-finger","parameters":{"pointerType":"touch"},
+            "type":"pointer","id":"finger","parameters":{"pointerType":"touch"},
             "actions":[{"type":"pointerMove","duration":0,"origin":"viewport","x":100,"y":200},
                        {"type":"pointerDown","button":0},{"type":"pause","duration":50},
                        {"type":"pointerUp","button":0}]}]}))
@@ -400,7 +413,7 @@ class ScreenProtocolTests(unittest.TestCase):
                              ("rotated", "stale_viewport"), ("outside", "invalid_argument"),
                              ("extra", "invalid_argument"), ("nan", "invalid_argument")]:
             runtime, client, screen = self.runtime()
-            args = dict(action="tap", x=100, y=200, width=390, height=844)
+            args = dict(action="tap", x=100, y=200, width=390, height=844, geometry="test:0")
             if change == "paused":screen.is_paused = True
             if change == "locked":client.locked = True
             if change == "rotated":args["width"] = 844
@@ -414,7 +427,7 @@ class ScreenProtocolTests(unittest.TestCase):
 
     def test_pointer_busy_and_uncertain_mutation_are_never_replayed(self):
         runtime, client, screen = self.runtime()
-        args = dict(action="tap", x=100, y=200, width=390, height=844)
+        args = dict(action="tap", x=100, y=200, width=390, height=844, geometry="test:0")
         with (runtime.state_dir / "operation.lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             with self.assertRaises(WDAError) as caught:runtime.call("pua_screen_action", args)

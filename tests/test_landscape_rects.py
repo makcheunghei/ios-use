@@ -305,6 +305,10 @@ class LandscapeRectTests(unittest.TestCase):
                         root.remove(child)
                         window.append(child)
                     root.append(window)
+                    # Live SpringBoard also reported empty landscape windows:
+                    # these do not change the coordinate system of home icons.
+                    ET.SubElement(root, "XCUIElementTypeWindow", {
+                        "type":"XCUIElementTypeWindow","width":"1376","height":"1032"})
                     # Real SpringBoard also includes pixel-sized overlay windows.
                     ET.SubElement(root, "XCUIElementTypeWindow", {
                         "type": "XCUIElementTypeWindow", "width": "2752", "height": "2064"})

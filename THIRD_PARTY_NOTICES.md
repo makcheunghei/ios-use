@@ -1,8 +1,8 @@
 # Third-party components
 
-The WDA runtime fetches Appium WebDriverAgent 16.14.0 at commit
-`d17782422d55ff1e5e0ceb74eb1fd509cc0c35b6` from
-https://github.com/appium/WebDriverAgent. WDA is BSD licensed; its original
+The WDA runtime fetches Appium WebDriverAgent 17.0.12 at commit
+`717f2ef78791b512db80f81d9a73ff5be321ea57` from
+https://github.com/appium/appium-ios/tree/717f2ef78791b512db80f81d9a73ff5be321ea57/packages/webdriveragent. WDA is BSD licensed; its original
 LICENSE stays in the external checkout. WDA source, builds and signing data
 are not bundled into this plugin.
 

@@ -1,5 +1,11 @@
 # 更新记录
 
+## 0.4.0 — 2026-11-20
+
+- 加入按裝置分流的 session、USB 連接埠及預覽。首次純讀屏可用 `screen_only=true` 跳過 XML。
+- 橫屏預覽根據 JPEG EXIF 計算顯示尺寸，點按前核對方向及影格。SpringBoard 的直向圖示座標按所屬視窗轉換。
+- 更新至 Appium WebDriverAgent 17.0.12。啟動前檢查構建紀錄及描述檔裝置資格。
+
 ## 0.3.12 — 2026-10-13
 
 - 合并 PR #10（@xiangyingchang）：将间接依赖 shell-quote 固定到 1.11.0，修复 GHSA-pqg4-j6r4-53mv；保持 appium-ios-device 3.1.24。

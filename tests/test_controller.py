@@ -89,6 +89,7 @@ class FakeWDA:
     def session(self, method, path, payload=None, timeout=None):
         self.calls.append((method, path, copy.deepcopy(payload)))
         self.timeouts.append((method, path, timeout))
+        if path == "/rotation":return {"x":0,"y":0,"z":0}
         if path.startswith("/source"):
             return self.source()
         if path == "/window/size":
@@ -157,8 +158,10 @@ class FakeWDA:
             if self.focused is not None and text != "\n" and self.input_override is None:
                 self.focused["value"] += text
             return None
-        if path in ("/wda/tap", "/wda/pressButton", "/actions"):
+        if path in ("/wda/pressButton", "/actions"):
             return None
+        if path == "/wda/screen":
+            return {"screenSize": self.size}
         if path == "/appium/settings":
             self.settings.append(payload["settings"])
             return {}
@@ -203,7 +206,7 @@ class ControllerTests(unittest.TestCase):
         self.client.calls.clear()
         result = self.phone.tap(x=100, y=220, observation_id=observed["observation_id"])
         self.assertTrue(result["verification_deferred"])
-        self.assertEqual(self.client.actions()[-1][1], "/wda/tap")
+        self.assertEqual(self.client.actions()[-1][1], "/actions")
 
     def test_changed_app_or_orientation_rejects_supplied_coordinate_context(self):
         for change in ("app", "orientation"):
@@ -238,12 +241,12 @@ class ControllerTests(unittest.TestCase):
     def test_screenshot_coordinate_context_tolerates_changing_pixels(self):
         observed = self.phone.observe("screenshot")
         self.phone.tap(x=100, y=220, observation_id=observed["observation_id"], observe="none")
-        self.assertEqual(self.client.actions()[-1][1], "/wda/tap")
+        self.assertEqual(self.client.actions()[-1][1], "/actions")
         self.client.screenshot += b"changed picture"
         self.client.calls.clear()
         result = self.phone.tap(x=100, y=220, observation_id=observed["observation_id"])
         self.assertTrue(result["action_executed"])
-        self.assertEqual(self.client.actions()[-1][1], "/wda/tap")
+        self.assertEqual(self.client.actions()[-1][1], "/actions")
         self.assertFalse(any(path == "/screenshot" for _, path, _ in self.client.calls))
         self.assertFalse(any(path.startswith("/source") for _, path, _ in self.client.calls))
 
@@ -253,7 +256,7 @@ class ControllerTests(unittest.TestCase):
         self.client.screenshot += b"custom-rendered content changed"
         self.client.calls.clear()
         self.phone.tap(x=100, y=220, observation_id=observed["observation_id"])
-        self.assertEqual(self.client.actions()[-1][1], "/wda/tap")
+        self.assertEqual(self.client.actions()[-1][1], "/actions")
         self.assertFalse(any(path.startswith("/source") or path == "/screenshot" for _, path, _ in self.client.calls))
 
     def test_custom_scroll_ignores_carousel_changes_outside_region(self):
@@ -1315,7 +1318,7 @@ class ControllerTests(unittest.TestCase):
         self.assertTrue(result["error"]["action_executed"])
         self.assertIn("image", result["error"]["observation"])
         self.assertEqual(sum(path == "/screenshot" for _, path, _ in self.client.calls), 1)
-        self.assertEqual([path for _, path, _ in self.client.actions()], ["/wda/tap"])
+        self.assertEqual([path for _, path, _ in self.client.actions()], ["/actions"])
 
     def test_screenshot_failure_keeps_original_ui_error_and_does_not_retry(self):
         original = self.client.request

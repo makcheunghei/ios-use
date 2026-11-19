@@ -69,8 +69,8 @@ for (const block of result.content ?? []) {
          "以用户实际提交的选项或明确回复为准；提问被跳过、超时、没有答复，或工具在用户作答前就返回，都不能当作完成。"),
     ],
     "skills/iphone-use/references/tool-fallback.md": [
-        ("普通版提供 17 个模型工具；先查看本回合实际可调用的工具绑定（支持时用 ALL_TOOLS 或工具搜索），不能只从 tools/list、文档或先前聊天推断已经绑定。0.1.6 的 install.sh 同时注册同名标准 MCP，避免 Codex 插件共享说明预算隐藏工具，并保留完整 batch schema。新版安装后重新连接聊天；",
-         "普通版提供 17 个模型工具，WorkBuddy 中名为 `mcp__iphone_use__pua_*`；先查看本回合实际可调用的工具绑定，不能只从 tools/list、文档或先前聊天推断已经绑定。WorkBuddy 版由 `workbuddy/install.py` 把标准 MCP `iphone_use` 写入 `~/.workbuddy/mcp.json`；安装或更新后需要在「连接器管理」信任该服务并新开会话；"),
+        ("普通版提供 18 个模型工具；先查看本回合实际可调用的工具绑定（支持时用 ALL_TOOLS 或工具搜索），不能只从 tools/list、文档或先前聊天推断已经绑定。0.1.6 的 install.sh 同时注册同名标准 MCP，避免 Codex 插件共享说明预算隐藏工具，并保留完整 batch schema。新版安装后重新连接聊天；",
+         "普通版提供 18 个模型工具，WorkBuddy 中名为 `mcp__iphone_use__pua_*`；先查看本回合实际可调用的工具绑定，不能只从 tools/list、文档或先前聊天推断已经绑定。WorkBuddy 版由 `workbuddy/install.py` 把标准 MCP `iphone_use` 写入 `~/.workbuddy/mcp.json`；安装或更新后需要在「连接器管理」信任该服务并新开会话；"),
         ("通过 `functions.exec` 时逐个内容块转发：文字用 `text(block.text)`，图片用 `image(block)`；不要 `text(result)` 把截图变成 base64 文本。图片无法转发时用 `view_image` 打开 `image.path` / `error.observation.image.path`。",
          "截图作为图片块随结果返回；结果里没有看到图片时，用读取文件的工具打开 `image.path` / `error.observation.image.path`，不要把 base64 文本当成截图。"),
         ("从当前项目或已安装插件确定 `<PLUGIN_ROOT>`，不要照抄某人的版本 cache 路径。",
@@ -136,7 +136,7 @@ SCREEN_SCRIPT = """<style>#toolbar{display:none!important}</style>
 <script>
 (function () {
   var pending = [], direct = null, blocked = false, proven = false, pulling = false, misses = 0;
-  var latest = null, newest = null, given = null;
+  var latest = null, newest = null, given = null, target = null;
   function picture() { return document.getElementById("image"); }
   function show(frame) {
     var image = picture();
@@ -149,49 +149,54 @@ SCREEN_SCRIPT = """<style>#toolbar{display:none!important}</style>
   function pull() {
     if (!direct || document.hidden) { pulling = false; return; }
     pulling = true;
+    var requested = direct;
     var stop = new AbortController(), giveUp = setTimeout(function () { stop.abort(); }, 3000);
     fetch(direct + "/frame/" + (newest ? newest.seq : 0) + "/0?wait=250", {cache: "no-store", signal: stop.signal}).then(function (reply) {
       if (!reply.ok) throw new Error("frame source");
       return reply.json();
     }).then(function (preview) {
       clearTimeout(giveUp);
+      if (requested !== direct) return;
       settle();
       proven = true; misses = 0; latest = preview;
       if (preview.paused) { newest = given = null; }
       if (preview.frame) {
         newest = preview.frame;
-        if (given && given.width === newest.width && given.height === newest.height) show(newest);
+        if (given && given.width === newest.width && given.height === newest.height && given.geometry === newest.geometry) show(newest);
       }
       if (preview.frame) pull(); else setTimeout(pull, 30);
     }).catch(function () {
       clearTimeout(giveUp);
+      if (requested !== direct) return;
       if (++misses < 4) { setTimeout(pull, 250); return; }
       blocked = !proven; direct = latest = null; pulling = false; misses = 0;
     });
   }
   window.__workbuddyFrame = function (app, call, options) {
     var cursor = call.arguments || {}, after = Number(cursor.after_seq) || 0, seen = Number(cursor.last_event_id) || 0;
+    var next = cursor.device || null;
+    if (target !== next) { settle(); direct = latest = newest = given = null; proven = pulling = false; target = next; }
     if (direct && latest) {
       if (!pulling) pull();
       var answer = {}, image = picture();
       for (var key in latest) if (key !== "frame" && key !== "more" && key !== "direct") answer[key] = latest[key];
-      var hand = newest && newest.seq > after && (!given || image.hidden || !image.getAttribute("src") || given.width !== newest.width || given.height !== newest.height);
+      var hand = newest && newest.seq > after && (!given || image.hidden || !image.getAttribute("src") || given.width !== newest.width || given.height !== newest.height || given.geometry !== newest.geometry);
       answer.frame = hand ? newest : null;
-      if (hand) given = {width: newest.width, height: newest.height};
+      if (hand) given = {width: newest.width, height: newest.height, geometry: newest.geometry};
       answer.events = (latest.events || []).filter(function (event) { return event.id > seen; });
       return Promise.resolve({content: [], structuredContent: answer, isError: false});
     }
-    return app.readServerResource({uri: "__FRAME__" + after + "/" + seen}, options).then(function (read) {
+    return app.readServerResource({uri: "__FRAME__" + after + "/" + seen + (target ? "/" + encodeURIComponent(target) : "")}, options).then(function (read) {
       var preview = JSON.parse(read.contents[0].text);
       var frames = (preview.more || []).concat(preview.frame ? [preview.frame] : []);
       var first = frames[0], last = frames[frames.length - 1];
-      if (last) { newest = last; given = {width: last.width, height: last.height}; }
+      if (last) { newest = last; given = {width: last.width, height: last.height, geometry: last.geometry}; }
       if (preview.direct && !blocked && !direct) { direct = preview.direct; pull(); }
       delete preview.more;
       delete preview.direct;
       settle();
-      if (frames.length > 1 && first.width === last.width && first.height === last.height) {
-        preview.frame = {seq: last.seq, data: first.data, mimeType: first.mimeType, width: first.width, height: first.height};
+      if (frames.length > 1 && frames.every(function (f) { return f.width === last.width && f.height === last.height && f.geometry === last.geometry; })) {
+        preview.frame = {seq: last.seq, data: first.data, mimeType: first.mimeType, width: first.width, height: first.height, geometry: first.geometry};
         frames.slice(1).forEach(function (frame) {
           pending.push(setTimeout(function () { show(frame); }, Math.max(0, frame.at - first.at)));
         });

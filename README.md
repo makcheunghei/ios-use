@@ -113,7 +113,7 @@ https://github.com/zhongerxin/iPhone-use
 | Python 3.9+ | 运行 MCP 服务；Python 端使用标准库 |
 | Node.js 20.19+、22.12+ 或 24+，npm 10+ | USB 转发与屏幕流；支持范围以项目 engines 和 doctor 检查为准 |
 
-Xcode 需要支持手机当前的 iOS 版本。无需越狱，也无需单独启动 Appium Server。WDA 固定使用已验证的 16.14.0 提交，下载、依赖安装、签名和构建由 setup 流程管理。
+Xcode 需要支持手机当前的 iOS 版本。无需越狱，也无需单独启动 Appium Server。WDA 固定使用已验证的 17.0.12 提交，下载、依赖安装、签名和构建由 setup 流程管理。
 
 ### 先在自己的 iPhone 上安装并启动 WDA
 
@@ -191,7 +191,9 @@ sh scripts/install.sh
 
 ## 工具概览
 
-模型可用 17 个工具，另有 2 个仅供屏幕 widget 使用的工具。
+用 `pua_devices()` 列出已連接裝置。每次呼叫可傳 `device="ipad"`、`"iphone"` 或完整 UDID，batch 在外層指定一次。每部機有獨立 session、連接埠及預覽。省略時沿用原有預設。簡單讀屏用 `pua_ready(device="ipad", screen_only=true)`，已連線可用 `pua_observe(device="ipad", mode="screenshot")`，兩者都直接回傳截圖並跳過 XML。
+
+模型可用 18 个工具，另有 2 个仅供屏幕 widget 使用的工具。
 
 | 工具 | 用途 |
 | --- | --- |
