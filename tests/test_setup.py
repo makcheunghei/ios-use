@@ -27,6 +27,15 @@ class SetupTests(unittest.TestCase):
         return self.manager.setup("configure", udid="00008150-ABCDEF0123456789", team_id="ABCDE12345",
                                   bundle_id="com.example.wdarunner", **extra)
 
+    def test_start_preflight_rejects_an_expired_or_other_device_profile(self):
+        config = self.configure()["config"]
+        wda_setup._write_json(self.manager.state_dir / "build.json", {
+            "commit": wda_setup.WDA_COMMIT, "config_fingerprint": wda_setup._fingerprint(config)})
+        for profile in ({"expired":True,"eligible":True},{"expired":False,"eligible":False}):
+            with self.subTest(profile=profile), patch.object(self.manager,"_profile_status",return_value=profile):
+                with self.assertRaisesRegex(ValueError,"provisioning profile"):
+                    self.manager._require_build(config)
+
     def job(self, token="owned-marker", pid=12345):
         return {"id": "a" * 32, "action": "start", "state": "running", "pid": pid,
                 "owner_token": token, "created_at": "2026-10-06T00:00:00Z", "config": {}}

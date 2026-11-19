@@ -1,15 +1,18 @@
 ---
 name: iphone-use-setup
-description: 配置 PUA（Phone Use Agent），在用户自己的 iPhone 或 iPad 上安装、签名并启动设备端执行服务；本对话首次使用先直接 setup，再验 READY，服务未启动时复用配置与构建启动，诊断 USB 和 Xcode 连接并打开设备屏幕侧边栏；适用于首次配置、冷启动、断线恢复或签名过期。
+description: 配置 PUA（Phone Use Agent），在用户自己的 iPhone 或 iPad 上安装、签名并启动设备端执行服务；简单读屏直接用 screen_only，首次操控先直接 setup，再验 READY，服务未启动时复用配置与构建启动，诊断 USB 和 Xcode 连接并打开设备屏幕侧边栏；适用于首次配置、冷启动、断线恢复或签名过期。
 ---
 
 # 把 iPhone / iPad 配置为 READY
+
+用户指定 iPad 或 iPhone 时，整项任务对每个工具调用（含 setup、READY 和 batch）传同一 device；同类多台用 pua_devices 返回的明确 ID。只需读当前画面时直接调用 pua_ready(device=目标, screen_only=true) 并使用返回图片；已就绪则一次 pua_observe(mode="screenshot", device=目标)。这条快捷路径不读 XML。连接确实未启动才按下方启动流程处理。
+
 
 使用本插件的 MCP 工具完成可重复的探测、构建、启动和连接；不要在每次任务中临时生成 Python 客户端。已有可用 PUA 时先复用，避免每个任务都重建或重装。
 
 ## 先确定当前状态
 
-本对话首次使用设备、尚未取得 READY 时，先直接调用 `pua_setup(action="status")`，按下节复用健康服务或活动工作，缺少服务才 start 一次；服务就绪后调用 `pua_ready(recover=true, screenshot=false)`，再执行用户设备任务。不要先 READY 失败再 setup；不以之前聊天的 READY 或已安装插件代替当前证明。本对话已 READY 且通道未失效时直接继续，不为每项任务重复 doctor、discover、build 和 start。首次配置或 READY 返回具体缺项时，使用 `pua_doctor` 与 `pua_setup(action="discover")` 读取 Xcode、已连接设备、签名、端口及进程状态。多台 iPhone 按用户提供的设备选择；只有一台符合条件时可以直接使用。设备 UDID、Team ID、日志和签名配置保存在用户本机，不写进源码或 Git。
+首次操控设备、尚未取得 READY 时，先直接调用 `pua_setup(action="status")`，按下节复用健康服务或活动工作，缺少服务才 start 一次；服务就绪后调用 `pua_ready(recover=true, screenshot=false)`，再执行用户设备任务。不要先 READY 失败再 setup；不以之前聊天的 READY 或已安装插件代替当前证明。本对话已 READY 且通道未失效时直接继续，不为每项任务重复 doctor、discover、build 和 start。首次配置或 READY 返回具体缺项时，使用 `pua_doctor` 与 `pua_setup(action="discover")` 读取 Xcode、已连接设备、签名、端口及进程状态。多台 iPhone 按用户提供的设备选择；只有一台符合条件时可以直接使用。设备 UDID、Team ID、日志和签名配置保存在用户本机，不写进源码或 Git。
 
 正常任务调用 `pua_ready(recover=true)` 或省略 recover 使用默认 true，不因预检或谨慎主动关闭恢复。只读诊断或用户明确禁止重启时传 `recover=false`，保留限制。常规任务无需截图时可传 `screenshot=false`；截图能力待实际需要截图时再使用。返回 `ready=true, state="ready"` 的 proof 包含 PUA status、可用会话、真实前台 App、设备视口、解锁状态与当前观察；直接用嵌套 observation 准备下一步，不立即重复 observe 或再做一轮导航测试。若镜像占用且控件树为空，工具返回 `mirroring_conflict`，退出镜像后重验 READY。Runner 图标、BUILD SUCCEEDED 或端口开放不足以声明 READY。READY 同时关联设备屏幕侧边栏，宿主支持时默认打开；已有通道要重新打开画面用 `pua_screen()`，不要重复 READY。预览走独立 USB MJPEG 通道（默认设备端口 9100），不使用 XML 或截图轮询；预览不可用本身不否定控制通道 READY，也不要求循环重启。READY 证明控制通道可用；常规 App 操作默认乐观执行，下一步所需观察顺带判断进度，最终关键结果才显式验收。
 

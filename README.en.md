@@ -122,7 +122,7 @@ If tools are missing, confirm the connector is enabled and start a new chat / Lo
 | Python 3.9+ | Run the MCP server using Python's standard library |
 | Node.js 20.19+, 22.12+, or 24+; npm 10+ | USB forwarding and screen streaming; see the project engines and doctor checks |
 
-Xcode must support the phone's iOS version. No jailbreak or separate Appium Server is required. Setup uses a verified, pinned WDA 16.14.0 commit and manages downloads, dependencies, signing, and builds locally.
+Xcode must support the phone's iOS version. No jailbreak or separate Appium Server is required. Setup uses a verified, pinned WDA 17.0.12 commit and manages downloads, dependencies, signing, and builds locally.
 
 ## Install and start WDA on your own iPhone
 
@@ -197,7 +197,9 @@ These changes reduce duplicate requests and model round trips. Overall task spee
 
 ## Tools
 
-There are 17 model tools and 2 additional widget-only tools.
+Use `pua_devices()` to list attached devices. Pass `device="ipad"`, `"iphone"` or an exact UDID on each call, including the outer batch. Each configured device has a separate session, port and preview. Omit the selector to keep the existing default. For a quick look call `pua_ready(device="ipad", screen_only=true)` once. On a healthy session use `pua_observe(device="ipad", mode="screenshot")`. Both return an image without fetching XML.
+
+There are 18 model tools and 2 additional widget-only tools.
 
 | Tools | Purpose |
 | --- | --- |

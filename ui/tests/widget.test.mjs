@@ -12,7 +12,7 @@ ${source.replace("import { App } from '@modelcontextprotocol/ext-apps';", 'const
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 const preview = (fields = {}) => ({ server_time: 1000, frame_age_ms: 0, frame: null, viewport: null, busy: false, paused: false, events: [], ...fields });
 // Fixtures exist only in this isolated DOM test, never in the shipped widget.
-const frame = (seq = 1) => ({ seq, data: 'test-image-only', mimeType: 'image/png', width: 900, height: 1800 });
+const frame = (seq = 1) => ({ seq, geometry: 'screen:0', data: 'test-image-only', mimeType: 'image/png', width: 900, height: 1800 });
 
 async function harness({ reducedMotion = false, context = { displayMode: 'inline', availableDisplayModes: ['fullscreen'] }, reply, connectReply } = {}) {
   let now = 0;
@@ -86,6 +86,7 @@ async function harness({ reducedMotion = false, context = { displayMode: 'inline
     setTimeout: (fn, delay) => { const id = ++timerId; timers.set(id, { fn, delay, due: now + delay }); return id; },
     clearTimeout: id => timers.delete(id),
   });
+  instance.ontoolresult({structuredContent: preview()});
   return {
     app: instance, calls, lifecycle, elements, document, timers, resize,
     requestOptions, stageSize,
@@ -359,12 +360,12 @@ test('page-cache suspension retains pixels, stops work, and resumes on pageshow'
   assert.equal(h.timers.size, 0);
   h.event('focus');
   await h.tick();
-  assert.equal(h.calls.length, 2);
+  assert.equal(h.calls.filter(c => c.name === "pua_screen_frame").length, 2);
   h.event('pagehide', { persisted: false });
   h.visibility(true);
   h.visibility(false);
   await h.tick();
-  assert.equal(h.calls.length, 3);
+  assert.equal(h.calls.filter(c => c.name === "pua_screen_frame").length, 3);
   await h.app.onteardown();
   assert.equal(h.elements.screen.hidden, true);
 });
@@ -830,7 +831,7 @@ test('pointer click and drag map scaled screen coordinates and dispatch once', a
   const h = await livePointerHarness();
   h.pointer('pointerdown', 60, 120); h.pointer('pointerup', 60, 120); await flush();
   const taps = h.calls.filter(c => c.name === 'pua_screen_action');
-  assert.equal(JSON.stringify(taps[0].arguments), JSON.stringify({ action: 'tap', x: 100, y: 200, width: 400, height: 800 }));
+  assert.equal(JSON.stringify(taps[0].arguments), JSON.stringify({ action: 'tap', x: 100, y: 200, width: 400, height: 800, geometry: 'screen:0' }));
   h.app.ontoolresult({structuredContent: preview({frame_available:true})});
   h.elements.image.onload();
   h.pointer('pointerdown', 110, 320); h.pointer('pointerup', 110, 120); await flush();
@@ -1018,4 +1019,20 @@ test('viewport recovery failures are throttled while frame polling continues', a
   assert.equal(h.calls.filter(c => c.name === 'pua_screen_frame').length, 8);
   await h.tick();
   assert.equal(h.calls.filter(c => c.arguments.action === 'viewport').length, 2);
+});
+
+test('a same-size orientation flip cancels a held drag and routes the next poll to its device', async () => {
+  const h = await livePointerHarness();
+  const show = (id, seq, side) => h.app.ontoolresult({structuredContent: preview({
+    device_id: id, viewport: {width:800,height:400},
+    frame: {...frame(seq),width:1800,height:900,geometry:id + ':' + side},
+  })});
+  show('ipad-id',2,270); h.elements.image.onload();
+  h.pointer('pointerdown',60,120);
+  show('ipad-id',3,90); h.elements.image.onload();
+  h.pointer('pointerup',100,160); await flush();
+  assert.equal(h.calls.filter(c => ['tap','drag'].includes(c.arguments.action)).length,0);
+  show('phone-id',1,0); await h.tick();
+  const polls = h.calls.filter(c => c.name === 'pua_screen_frame');
+  assert.equal(polls.at(-1).arguments.device,'phone-id');
 });

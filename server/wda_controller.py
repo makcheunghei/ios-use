@@ -163,6 +163,7 @@ class PhoneController:
         self.accepted_actions=0
         self.screen=None
         self._screen_viewport=None
+        self._display_edges=None
         self._screen_targets={}
         self._viewport_cache=None
         self._rotation=None
@@ -204,9 +205,19 @@ class PhoneController:
             try:self.screen.gesture(kind,viewport=self._screen_viewport,**kwargs)
             except Exception:pass
 
+    def tap_point(self, x, y):
+        self.screen_event("tap", point={"x": x, "y": y})
+        actions = [
+            {"type": "pointerMove", "duration": 0, "origin": "viewport", "x": x, "y": y},
+            {"type": "pointerDown", "button": 0},
+            {"type": "pause", "duration": 50},
+            {"type": "pointerUp", "button": 0},
+        ]
+        self.post("/actions", {"actions": [{"type": "pointer", "id": "finger",
+                  "parameters": {"pointerType": "touch"}, "actions": actions}]})
+
     def post(self,path,payload,timeout=None,session=True):
-        if path=="/wda/tap":self.screen_event("tap",point={"x":payload["x"],"y":payload["y"]})
-        elif path.endswith("/click") and path[:-6] in self._screen_targets:
+        if path.endswith("/click") and path[:-6] in self._screen_targets:
             self.screen_event("tap",point=self._screen_targets[path[:-6]])
         elif path=="/wda/dragfromtoforduration":
             self.screen_event("drag",**{"from_point":{"x":payload["fromX"],"y":payload["fromY"]},"to_point":{"x":payload["toX"],"y":payload["toY"]},"duration_ms":max(300,min(3000,int((payload.get("duration",0)+.35)*1000)))})
@@ -230,6 +241,17 @@ class PhoneController:
         result={"width":v["width"],"height":v["height"],"units":"device points"}
         self._viewport_cache=(time.monotonic(),result)
         return dict(result)
+
+    def display_size(self, landscape):
+        """WDA's physical display is larger than window/size in iPad windowed mode."""
+        if self._display_edges is None:
+            info = self.client.session("GET", "/wda/screen")
+            size = info.get("screenSize") if isinstance(info,dict) else None
+            if not isinstance(size,dict) or not all(isinstance(size.get(k),(int,float))
+                    and size[k] > 0 for k in ("width","height")):
+                return None
+            self._display_edges = tuple(sorted((size["width"],size["height"])))
+        return self._display_edges[::-1] if landscape else self._display_edges
 
     def source_viewport(self,root):
         """Briefly reuse matching dimensions; source frames can stay portrait after rotation."""
@@ -277,6 +299,8 @@ class PhoneController:
         """Combine a fresh /rotation side (or the geometry fallback) with the recorded frame."""
         if frame is None:
             return None
+        if frame == "mixed":
+            return "unknown"
         portrait_width,portrait_height,geometry=frame
         side=side or geometry
         return (side,portrait_width,portrait_height) if side else "unknown"
@@ -383,8 +407,9 @@ class PhoneController:
                 continue
             if not all(math.isfinite(n) for n in rect.values()):
                 continue
-            raw.append((a,rect))
+            raw.append((element,rect))
         frame_root=root
+        window_frames={}
         if viewport["width"]>viewport["height"]:
             # On real iPads the Application can report landscape while its point-sized
             # Windows and descendants remain portrait. Ignore native-pixel overlays;
@@ -396,10 +421,19 @@ class PhoneController:
                 if window.get("type")!="XCUIElementTypeWindow":continue
                 try:size=(float(window.get("width",0)),float(window.get("height",0)))
                 except ValueError:continue
-                if size in (landscape,portrait):window_sizes.add(size)
+                if size not in (landscape,portrait):continue
+                # Empty overlay windows may use the opposite coordinate system.
+                descendants = [e for e in window.iter() if any(e.get(k) for k in ("label","name","value"))
+                               and e.get("type") != "XCUIElementTypeWindow"]
+                if not descendants:continue
+                window_sizes.add(size)
+                window_frames.update((e,size) for e in descendants)
             if window_sizes=={portrait}:
                 frame_root={**root,"width":portrait[0],"height":portrait[1]}
         frame=self.portrait_frame(frame_root,viewport,[{"rect":r} for _,r in raw])
+        mixed = len(set(window_frames.values())) > 1
+        if mixed:
+            frame = self.portrait_frame({"width":portrait[0],"height":portrait[1]},viewport)
         fresh=(self._probe is not None and before is not None and self._probe[0]==before
                and self._probe[1] is not None and time.monotonic()-before<=ROTATION_VIEWPORT_TTL)
         side=(self._probe[1] if fresh else self.rotation_side()) if frame else None
@@ -409,12 +443,14 @@ class PhoneController:
             # Reusing a side must not renew its age indefinitely during repeated tree reads.
             self._probe=(before if fresh else self._viewport_cache[0],side,self._source_app or probe_app)
         # Only the frame shape is cached (an "unknown" side is re-derived on every read).
-        self._frames[(viewport["width"],viewport["height"],self._source_app or probe_app)]=frame
+        self._frames[(viewport["width"],viewport["height"],self._source_app or probe_app)]="mixed" if mixed else frame
         self._rotation=rotation
         self.rotation_unknown=rotation=="unknown"
         nodes=[]
-        for a,rect in raw:
-            rect=self.to_viewport_rect(rect,rotation)
+        for element,rect in raw:
+            a = element.attrib
+            if not mixed or window_frames.get(element)==portrait:
+                rect=self.to_viewport_rect(rect,rotation)
             intersects=rect["width"]>0 and rect["height"]>0 and rect["x"]<viewport["width"] and rect["y"]<viewport["height"] and rect["x"]+rect["width"]>0 and rect["y"]+rect["height"]>0
             if not include_invisible and (not intersects or a.get("visible")=="false"):
                 continue
@@ -436,6 +472,12 @@ class PhoneController:
     def remember(self,nodes,viewport,app,has_tree=True):
         ident=uuid.uuid4().hex[:12]
         self.snapshots[ident]={"time":time.monotonic(),"viewport":viewport,"app":app,"nodes":nodes if has_tree else None}
+        if viewport["width"] > viewport["height"]:
+            side = self.rotation_side()
+            if has_tree and isinstance(self._rotation,tuple) and side != self._rotation[0]:
+                self._probe = None
+                stale("The device rotated during observation. Read a fresh screen.","rotation_changed")
+            self.snapshots[ident]["side"] = side
         while len(self.snapshots)>32:
             self.snapshots.popitem(last=False)
         return ident
@@ -495,6 +537,9 @@ class PhoneController:
                 result["warnings"]=["Empty accessibility tree: inspect a screenshot for lock, iPhone Mirroring conflict, loading, or custom-rendered content before acting."]
         if mode in ("screenshot","both"):
             result["image"]=self.capture(viewport)
+            if result["image"].get("display_points"):
+                self.snapshots[result["observation_id"]]["windowed"] = True
+                result.setdefault("warnings",[]).append("The app is windowed. Maximize it before using screen coordinates.")
         if self.rotation_unknown:
             result.setdefault("warnings",[]).append(ROTATION_UNKNOWN_WARNING)
         return result
@@ -521,7 +566,13 @@ class PhoneController:
                 old.unlink()
         image={"path":str(path),"mimeType":mime}
         if width and height:
-            image.update(width=width,height=height,pixel_to_point=[round(viewport["width"]/width,4),round(viewport["height"]/height,4)])
+            points = viewport["width"],viewport["height"]
+            if native and not any(native == (points[0]*scale,points[1]*scale) for scale in (1,2,3)):
+                display = self.display_size(native[0] > native[1])
+                if display and display != points:
+                    points = display
+                    image["display_points"] = list(display)
+            image.update(width=width,height=height,pixel_to_point=[round(points[0]/width,4),round(points[1]/height,4)])
         return image
 
     def snapshot(self,observation_id):
@@ -536,6 +587,10 @@ class PhoneController:
         old=self.snapshot(observation_id) if observation_id is not None else None
         # A supplied ID asks for a context check, so read the viewport again for it.
         viewport=self.viewport(0 if old else VIEWPORT_TTL)
+        if old and old.get("windowed"):
+            stale("Maximize the app before using frame coordinates.","windowed_app")
+        if old and viewport["width"] > viewport["height"] and (not old.get("side") or self.rotation_side() != old["side"]):
+            stale("Landscape orientation changed or is unknown. Read a fresh screen.","rotation_changed")
         if old and viewport!=old["viewport"]:
             stale("Orientation or viewport changed. Observe again before using the earlier coordinates.","viewport_changed")
         return viewport
@@ -680,6 +735,8 @@ class PhoneController:
         viewport=self.viewport(VIEWPORT_TTL)
         element=result["elements"][0] if result["matches"]==1 or selector.get("index") is not None else self.choose(result,viewport,editable)
         rect=self.element_rect(element)
+        if self.rotation_unknown:
+            fail("offscreen_target",ROTATION_UNKNOWN_WARNING, action_executed=False)
         cx=rect["x"]+rect["width"]/2;cy=rect["y"]+rect["height"]/2
         if rect["width"]<=0 or rect["height"]<=0 or not (0<=cx<viewport["width"] and 0<=cy<viewport["height"]):
             fail("offscreen_target","Target center is outside the viewport. Scroll the actual list into view, observe again and re-find the target; a stopped batch has not completed its failed step.",action_executed=False,target_rect=rect,viewport=viewport,recovery={"next_tool":"pua_observe","next_arguments":{"mode":"both"},"replay_action":False})
@@ -748,7 +805,7 @@ class PhoneController:
             if x>=viewport["width"] or y>=viewport["height"]:
                 fail("invalid_argument","Coordinates are outside the device viewport.")
             chosen=None
-            self.post("/wda/tap",{"x":x,"y":y})
+            self.tap_point(x,y)
         result=self.after(expect,observe)
         if chosen:result["target"]=chosen
         return result

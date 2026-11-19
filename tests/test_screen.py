@@ -42,6 +42,17 @@ class MJPEGTests(unittest.TestCase):
         for malformed in (b"", b"not JPEG", raw[:20], raw.replace(b"\x00\x0b", b"\xff\xff"), jpeg(width=0)):
             self.assertIsNone(jpeg_dimensions(malformed))
 
+    def test_portrait_encoded_landscape_jpeg_uses_exif_display_dimensions(self):
+        import struct
+        for order, magic in (("<",b"II"),(">",b"MM")):
+            for side, expected in ((1,(2064,2752)),(6,(2752,2064)),(8,(2752,2064))):
+                tiff = magic + struct.pack(order + "HIHHHIH",42,8,1,274,3,1,side) + bytes(6)
+                segment = b"Exif\0\0" + tiff
+                frame = jpeg(2064,2752)
+                frame = frame[:2] + b"\xff\xe1" + struct.pack(">H",2+len(segment)) + segment + frame[2:]
+                self.assertEqual(jpeg_dimensions(frame),expected)
+                self.assertEqual(MJPEGParser().feed(frame,with_orientation=True)[0][1],(expected,side))
+
     def test_byte_split_markers_and_multipart_yield_complete_frames(self):
         first, second = jpeg(), jpeg(1170, 2532)
         stream = b"HTTP/1.0 200 OK\r\n\r\n--frame\r\nContent-Type: image/jpeg\r\n\r\n" + first + b"\r\n--frame\r\n\r\n" + second

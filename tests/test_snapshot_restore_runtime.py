@@ -45,6 +45,7 @@ class SnapshotRestoreRuntimeTests(unittest.TestCase):
     def runtime(self):
         runtime = Runtime(self.directory, self.url)
         runtime.screen = Mock()
+        runtime.screen.frame.return_value = {"geometry":"preview:0","frame_age_ms":5}
         runtime.phone.screen = runtime.screen
         runtime.client.session_id = runtime.client._settings_session_id = "shared-session"
         runtime.phone._viewport_cache = (time.monotonic(), {
@@ -68,6 +69,10 @@ class SnapshotRestoreRuntimeTests(unittest.TestCase):
             value = False
         elif path.endswith("/window/size"):
             value = {"width": 390, "height": 844}
+        elif path.endswith("/wda/screen"):
+            value = {"screenSize":{"width":390,"height":844}}
+        elif path.endswith("/rotation"):
+            value = {"z": 0}
         elif path.endswith("/actions"):
             self.journal_events.append(("pointer", dict(self.native_settings), self.cache()))
             value = None
@@ -133,7 +138,7 @@ class SnapshotRestoreRuntimeTests(unittest.TestCase):
         self.requests.clear()
         self.peer.screen.paused.return_value = False
         result = self.peer.call("pua_screen_action", {
-            "action": "tap", "x": 50, "y": 120, "width": 390, "height": 844})
+            "action": "tap", "geometry": "preview:0", "x": 50, "y": 120, "width": 390, "height": 844})
         self.assertTrue(result["action_executed"])
         self.assertEqual(self.requests[0], ("POST", "/session/shared-session/appium/settings",
             {"settings": {**SESSION_SETTINGS, **self.restore}}))
@@ -155,7 +160,7 @@ class SnapshotRestoreRuntimeTests(unittest.TestCase):
         with patch.object(self.peer.client, "request", side_effect=fail_restore):
             with self.assertRaises(WDAError):
                 self.peer.call("pua_screen_action", {
-                    "action": "tap", "x": 50, "y": 120, "width": 390, "height": 844})
+                    "action": "tap", "geometry": "preview:0", "x": 50, "y": 120, "width": 390, "height": 844})
         self.assertFalse(any(path.endswith("/actions") for _, path, _ in self.requests))
         self.assertEqual(self.cache()["settings_restore"], self.restore)
 

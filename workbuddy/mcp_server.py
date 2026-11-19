@@ -84,7 +84,7 @@ class FrameResource:
     pua_screen_frame call it stands for, and that call's answer comes out as the resource.
     Only this read-only tool is reachable this way.
     """
-    URI = re.compile(re.escape(host_text.FRAME_URI) + r"(\d{1,16})/(\d{1,16})")
+    URI = re.compile(re.escape(host_text.FRAME_URI) + r"(\d{1,16})/(\d{1,16})(?:/([A-Za-z0-9-]{8,64}))?")
 
     def __init__(self, stdin, stdout):
         self.stdin, self.stdout = stdin, stdout
@@ -109,6 +109,7 @@ class FrameResource:
         with self.lock:
             self.reads[json.dumps(message["id"])] = frame.group(0)
         call = {"name": "pua_screen_frame", "arguments": {"after_seq": int(frame.group(1)), "last_event_id": int(frame.group(2))}}
+        if frame.group(3):call["arguments"]["device"] = frame.group(3)
         return json.dumps({"jsonrpc": "2.0", "id": message["id"], "method": "tools/call", "params": call}) + "\n"
 
     def write(self, text):

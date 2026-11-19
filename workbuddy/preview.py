@@ -81,11 +81,11 @@ def playback_hub(state_dir):
             self.recent = collections.deque(maxlen=4 * PLAYBACK_FRAMES)
             self.fresh = threading.Condition(self._lock)
 
-        def _publish_frame(self, raw, width, height, stop):
+        def _publish_frame(self, raw, width, height, stop, geometry=None):
             # One step under upstream's lock: a reader never meets a frame without its time.
             with self._lock:
                 previous = self._frame
-                super()._publish_frame(raw, width, height, stop)
+                super()._publish_frame(raw, width, height, stop, geometry)
                 if self._frame is not None and self._frame is not previous:
                     self._frame["at"] = self._now()
                     self.recent.append(self._frame)

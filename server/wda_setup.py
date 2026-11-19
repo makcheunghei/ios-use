@@ -31,9 +31,9 @@ import uuid
 # xcdevice reports iPads under the iphoneos platform; ipados is accepted defensively.
 XCDEVICE_PLATFORMS = {"com.apple.platform.iphoneos", "com.apple.platform.ipados"}
 
-WDA_COMMIT = "d17782422d55ff1e5e0ceb74eb1fd509cc0c35b6"
-WDA_VERSION = "16.14.0"
-WDA_REPOSITORY = "https://github.com/appium/WebDriverAgent.git"
+WDA_COMMIT = "717f2ef78791b512db80f81d9a73ff5be321ea57"
+WDA_VERSION = "17.0.12"
+WDA_REPOSITORY = "https://github.com/appium/appium-ios.git"
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_STATE = Path.home() / ".local/share/iphone-use"
 
@@ -135,6 +135,14 @@ def _diagnose(text):
          "The local forward port is in use. Reuse an already healthy WDA, stop only this plugin's owned job, or configure another local port; do not kill unrelated processes."),
     ]
     return [hint for needles, hint in cases if any(needle in text for needle in needles)]
+
+
+def default_wda_checkout(state_dir):
+    return state_dir / "runtime" / ("appium-ios-" + WDA_VERSION)
+
+
+def default_wda_project(state_dir):
+    return default_wda_checkout(state_dir) / "packages/webdriveragent"
 
 
 class SetupManager:
@@ -326,6 +334,7 @@ class SetupManager:
             values = plistlib.loads(decoded["stdout"].encode())
             expiration = values["ExpirationDate"].replace(tzinfo=dt.timezone.utc)
             return {"known": True, "expires_at": expiration.isoformat(), "expired": expiration <= dt.datetime.now(dt.timezone.utc),
+                    "eligible": bool(values.get("ProvisionsAllDevices") or self.config.get("udid") in values.get("ProvisionedDevices", [])),
                     "note": "Provisioning expiry does not verify device certificate trust or Apple account login."}
         except (ValueError, KeyError, AttributeError):
             return {"known": False, "note": "Could not decode the built provisioning profile; verify signing in Xcode."}
@@ -400,6 +409,10 @@ class SetupManager:
         marker = _read_json(self.state_dir / "build.json", {})
         if marker.get("config_fingerprint") != _fingerprint(config) or marker.get("commit") != WDA_COMMIT:
             raise ValueError("Run build successfully for this configuration before start; start uses test-without-building.")
+
+        profile = self._profile_status()
+        if profile.get("expired") or profile.get("eligible") is False:
+            raise ValueError("Rebuild WDA: the provisioning profile expired or excludes the selected device.")
 
     @staticmethod
     def _publishing_pid(job):
@@ -681,7 +694,7 @@ class SetupManager:
                     if set(args) - allowed_args:
                         raise ValueError("Unknown configure arguments: " + ", ".join(sorted(set(args) - allowed_args)))
                     config = {"udid": args.get("udid"), "team_id": args.get("team_id"), "bundle_id": args.get("bundle_id"),
-                              "source_dir": str(Path(args.get("source_dir") or self.state_dir / "runtime/WebDriverAgent").expanduser().resolve()),
+                              "source_dir": str(Path(args.get("source_dir") or default_wda_project(self.state_dir)).expanduser().resolve()),
                               "local_port": args.get("local_port", self.port), "device_port": args.get("device_port", 8100)}
                     self._validate_config(config)
                     if args.get("source_dir"):
@@ -701,6 +714,9 @@ class SetupManager:
                 if action == "start":
                     healthy = self._probe_status()
                     if healthy["ready"]:
+                        running_version = healthy.get("wda", {}).get("build", {}).get("version")
+                        if running_version and running_version != WDA_VERSION:
+                            raise ValueError(f"Port {self.port} serves WDA {running_version}; this build requires {WDA_VERSION}. Select its matching port or stop its owned job before starting.")
                         return {"ok": True, "already_ready": True, "service": healthy,
                                 "note": "Reusing reachable WDA. This plugin does not own or stop that external service."}
                     self._require_build(config)
@@ -786,13 +802,13 @@ def _worker(state_dir, job_id, owner_token, base_url):
     try:
         action, config = job["action"], job["config"]
         if action == "fetch":
-            source = manager.state_dir / "runtime/WebDriverAgent"
+            source = default_wda_checkout(manager.state_dir)
             if not source.exists():
                 source.mkdir(mode=0o700)
                 run(["git", "init", str(source)])
                 run(["git", "-C", str(source), "remote", "add", "origin", WDA_REPOSITORY])
             try:
-                manager._source({"source_dir": str(source)})
+                manager._source({"source_dir": str(default_wda_project(manager.state_dir))})
             except ValueError:
                 # Resume an interrupted fetch in this plugin-owned checkout.
                 # Never reset tracked modifications or touch a reused source_dir.
@@ -802,8 +818,8 @@ def _worker(state_dir, job_id, owner_token, base_url):
                     raise ValueError("Owned runtime checkout is modified or has a different origin. Preserve it and select a new external runtime state directory before fetching again.")
                 run(["git", "-C", str(source), "fetch", "--depth", "1", "origin", WDA_COMMIT])
                 run(["git", "-C", str(source), "checkout", "--detach", "FETCH_HEAD"])
-                manager._source({"source_dir": str(source)})
-            job["source_dir"] = str(source)
+                manager._source({"source_dir": str(default_wda_project(manager.state_dir))})
+            job["source_dir"] = str(default_wda_project(manager.state_dir))
         elif action in {"build", "start", "recover"}:
             manager._validate_config(config)
             source = manager._source(config)
