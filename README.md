@@ -1,16 +1,26 @@
-# iPhone Use
+# iOS Use
 
 **中文** · [English](README.en.md)
 
-![iPhone Use 在 Codex 中操作真实 iPhone 并实时展示手机屏幕](assets/iphone-use-demo.png)
+![iOS Use 在 Codex 中操作真实 iPhone 并实时展示手机屏幕](assets/ios-use-demo.png)
 
 让 Codex、WorkBuddy 或豆包工作通过 USB 操作你的真实 iPhone。用自然语言描述任务，助手就能打开 App、读取页面、点击、滚动、输入文字、整理列表，并在侧边栏展示手机屏幕。
 
-iPhone Use 使用 [WebDriverAgent](https://github.com/appium/WebDriverAgent)（WDA）与 iPhone 通信，包含本地 MCP 服务、安装与使用技能，以及实时屏幕 widget。它优先复用现有连接与构建；控件定位失败时，指导模型查看截图并尝试坐标点击。
+iOS Use 使用 [WebDriverAgent](https://github.com/appium/WebDriverAgent)（WDA）与 iPhone 通信，包含本地 MCP 服务、安装与使用技能，以及实时屏幕 widget。它优先复用现有连接与构建；控件定位失败时，指导模型查看截图并尝试坐标点击。
 
 插件默认向独立的 PostHog 项目发送匿名使用统计，包括启动、工具调用、连接状态、耗时和错误类别。使用随机安装标识，不上传手机画面、输入内容或设备标识。设置 `IPHONE_USE_ANALYTICS=0` 或 `DO_NOT_TRACK=1` 并重启 MCP 服务可关闭。详见 [埋点与分析说明](ANALYTICS.md)。
 
 **使用前，需要先在你自己的 iPhone 上安装、签名并启动 WDA Runner。** WDA 是运行在手机上的执行服务；下面的提示词和 setup 流程可以让所用宿主的助手协助完成首次安装，已有健康的 WDA 可直接复用。
+
+## 通过 Magpie 使用
+
+在操控 Mac 的持久项目目录运行以下命令，向 Magpie Library 注册本机 USB 服务。启用 Magpie MCP Router 时，Codex 通过已有的 Magpie 连接调用此服务。
+
+```sh
+magpie library mcp add ios_use /usr/bin/python3 "$PWD/server/iphone_use.py" agents=codex --local
+```
+
+已有安装会沿用 `~/.local/share/iphone-use` 中的设备配置、签名构建及端口。本项目源自 [iPhone Use](https://github.com/zhongerxin/iPhone-use)。
 
 ## 最近更新
 
@@ -28,15 +38,15 @@ iPhone Use 使用 [WebDriverAgent](https://github.com/appium/WebDriverAgent)（W
 将下面这段话复制到本机 Codex：
 
 ```text
-请帮我安装和配置 iPhone Use：
-https://github.com/zhongerxin/iPhone-use
+请帮我安装和配置 iOS Use：
+https://github.com/makcheunghei/ios-use
 
 先读取仓库 README 和安装脚本，检查本机 Codex CLI、Python、Node.js、npm、
 完整 Xcode，以及通过 USB 连接的 iPhone。把项目放到合适的本机目录，
 运行 sh scripts/install.sh 安装插件。
 
 如果当前聊天还没有加载新工具，明确告诉我重连或新开聊天后继续。
-工具可用后读取 iphone-use-setup 技能，检查现有配置，优先复用已有 WDA。
+工具可用后读取 ios-use-setup 技能，检查现有配置，优先复用已有 WDA。
 首次配置时发现我的设备，使用我自己的 Apple 开发团队和可签名 bundle ID，
 获取固定版本 WDA、配置签名、构建并启动，直到 pua_ready 返回 ready=true，
 然后打开手机屏幕。不要照搬作者的设备标识或签名信息。
@@ -55,24 +65,24 @@ https://github.com/zhongerxin/iPhone-use
 
 | 宿主 | 在源码目录运行 | 安装后的接入 |
 | --- | --- | --- |
-| [WorkBuddy](https://github.com/zhongerxin/iPhone-use/blob/main/workbuddy/README.md) | `python3 workbuddy/install.py` | 在「连接器管理」信任 `iphone_use`，新开会话 |
-| [豆包工作](https://github.com/zhongerxin/iPhone-use/blob/main/doubao/README.md) | `python3 doubao/install.py` | 按安装器输出新建 STDIO 连接器，上传两个技能，新开「本地电脑」任务 |
+| [WorkBuddy](https://github.com/makcheunghei/ios-use/blob/main/workbuddy/README.md) | `python3 workbuddy/install.py` | 在「连接器管理」信任 `ios_use`，新开会话 |
+| [豆包工作](https://github.com/makcheunghei/ios-use/blob/main/doubao/README.md) | `python3 doubao/install.py` | 按安装器输出新建 STDIO 连接器，上传两个技能，新开「本地电脑」任务 |
 
 将对应提示词发给本机的 WorkBuddy 或豆包工作。助手可执行本地安装；宿主界面的接入步骤若无法自动操作，会说明需要你完成的具体步骤。首次签名仍使用你自己的 Apple 账号和开发团队。
 
 ### 发给 WorkBuddy 的提示词
 
 ```text
-请在这台 Mac 上安装 iPhone Use，让 WorkBuddy 通过 USB 操作我的真实 iPhone：
-https://github.com/zhongerxin/iPhone-use
+请在这台 Mac 上安装 iOS Use，让 WorkBuddy 通过 USB 操作我的真实 iPhone：
+https://github.com/makcheunghei/ios-use
 
 先读取 README.md、workbuddy/README.md 和安装脚本，检查 Python、Node.js、npm、
 完整 Xcode 和 USB iPhone。克隆或复用本地源码，保留已有改动，
 在源码目录运行 python3 workbuddy/install.py；不要运行 Codex 安装脚本。
-在 WorkBuddy「连接器管理」里信任并启用 iphone_use，然后新开会话加载工具和技能。
+在 WorkBuddy「连接器管理」里信任并启用 ios_use，然后新开会话加载工具和技能。
 如果这些界面步骤需要我操作，给出具体位置，等我完成后继续。
 
-工具可用后读取 iphone-use-setup，先查询 setup status，复用已有配置、健康 WDA
+工具可用后读取 ios-use-setup，先查询 setup status，复用已有配置、健康 WDA
 或正在运行的启动任务；首次配置使用我自己的设备和 Apple 开发团队完成签名与启动。
 确认 pua_ready 返回 ready=true 后调用一次 pua_screen()，在侧边栏显示实时手机画面，
 再在 iPhone 计算器中验证 12×34=408。Apple 登录、信任、开发者模式或解锁
@@ -82,18 +92,18 @@ https://github.com/zhongerxin/iPhone-use
 ### 发给豆包工作的提示词
 
 ```text
-请在这台 Mac 上安装 iPhone Use，让豆包工作通过 USB 操作我的真实 iPhone：
-https://github.com/zhongerxin/iPhone-use
+请在这台 Mac 上安装 iOS Use，让豆包工作通过 USB 操作我的真实 iPhone：
+https://github.com/makcheunghei/ios-use
 
 在「本地电脑」任务中先读取 README.md、doubao/README.md 和安装脚本，
 检查 Python、Node.js、npm、完整 Xcode 和 USB iPhone。克隆或复用本地源码，
 保留已有改动，在源码目录运行 python3 doubao/install.py；不要运行 Codex 安装脚本。
-按安装器输出，在「插件 · 技能 · 伙伴」中新建名为 iphone_use 的 STDIO 连接器，
-命令和参数使用输出的绝对路径，并分别上传安装目录下的 iphone-use、iphone-use-setup
+按安装器输出，在「插件 · 技能 · 伙伴」中新建名为 ios_use 的 STDIO 连接器，
+命令和参数使用输出的绝对路径，并分别上传安装目录下的 ios-use、ios-use-setup
 两个技能文件夹。启用连接器和技能，再新开「本地电脑」任务；已有连接器更新后关闭再打开。
 如果这些界面步骤需要我操作，给出具体位置和路径，等我完成后继续。
 
-工具可用后读取 iphone-use-setup，先查询 setup status，复用已有配置、健康 WDA
+工具可用后读取 ios-use-setup，先查询 setup status，复用已有配置、健康 WDA
 或正在运行的启动任务；首次配置使用我自己的设备和 Apple 开发团队完成签名与启动。
 确认 pua_ready 返回 ready=true 后调用一次 pua_screen()，在右侧 MCP App 显示实时手机画面，
 再在 iPhone 计算器中验证 12×34=408。Apple 登录、信任、开发者模式或解锁
@@ -119,7 +129,7 @@ Xcode 需要支持手机当前的 iOS 版本。无需越狱，也无需单独启
 
 手机端使用 [Appium 维护的 WebDriverAgent](https://github.com/appium/WebDriverAgent)。首次使用时，须通过 Xcode 用你自己的 Apple 账号与开发团队签名、安装并启动 `WebDriverAgentRunner`。
 
-推荐使用上面的安装提示词和下面的 `iphone-use-setup` 流程：Codex 获取本项目固定版本的 WDA，配置你的设备和签名，再完成构建、部署与启动；需要你完成 Apple 登录、设备信任、开发者模式或解锁时，会提示具体步骤。
+推荐使用上面的安装提示词和下面的 `ios-use-setup` 流程：Codex 获取本项目固定版本的 WDA，配置你的设备和签名，再完成构建、部署与启动；需要你完成 Apple 登录、设备信任、开发者模式或解锁时，会提示具体步骤。
 
 如需在 Xcode 手动处理：
 
@@ -132,20 +142,20 @@ Xcode 需要支持手机当前的 iOS 版本。无需越狱，也无需单独启
 ### 安装插件
 
 ```sh
-git clone https://github.com/zhongerxin/iPhone-use.git
-cd iPhone-use
+git clone https://github.com/makcheunghei/ios-use.git
+cd ios-use
 sh scripts/install.sh
 ```
 
-脚本验证并暂存源码，通过 Codex CLI 注册本地 marketplace、安装插件和技能，并将安装缓存中的服务注册为标准 MCP `iphone_use`。插件与标准配置使用同一命名空间，避免重复工具注册。
+脚本验证并暂存源码，通过 Codex CLI 注册本地 marketplace、安装插件和技能，并将安装缓存中的服务注册为标准 MCP `ios_use`。插件与标准配置使用同一命名空间，避免重复工具注册。
 
 源代码包解压后，也可以在包目录运行同一个安装脚本。安装完成后重连或新开 Codex 聊天。
 
 ### 连接自己的 iPhone
 
-在新聊天中启用 **iPhone Use**，输入：
+在新聊天中启用 **iOS Use**，输入：
 
-> 用 iphone-use-setup 帮我配置通过 USB 连接的 iPhone，安装并启动 WDA，验证 READY，然后显示手机屏幕。
+> 用 ios-use-setup 帮我配置通过 USB 连接的 iPhone，安装并启动 WDA，验证 READY，然后显示手机屏幕。
 
 技能引导 Codex 完成诊断、设备发现、签名配置、获取 WDA、后台构建与启动。已配置过的设备会复用配置和构建，正常任务不需要每次重装。`pua_ready` 返回 `ready=true` 后才开始手机任务。
 
@@ -166,7 +176,7 @@ sh scripts/install.sh
 示例提示词：
 
 ```text
-用 iPhone Use 打开备忘录，新建一条草稿，输入下面的中文内容，核对文字后保留。
+用 iOS Use 打开备忘录，新建一条草稿，输入下面的中文内容，核对文字后保留。
 
 打开目标 App，搜索这个名称，读取前几项结果并整理给我。
 
@@ -209,7 +219,7 @@ sh scripts/install.sh
 
 ## 本机数据与升级
 
-新安装默认使用 `~/.local/share/iphone-use/`，可通过 `IPHONE_USE_STATE_DIR` 指定外部目录；原 `WDA_STATE_DIR` 仍兼容。升级时若新目录不存在，会继续使用检测到的旧配置目录，保留设备、签名和构建。不要为了改名删除运行数据。
+新安装默认使用 `~/.local/share/ios-use/`，可通过 `IPHONE_USE_STATE_DIR` 指定外部目录；原 `WDA_STATE_DIR` 仍兼容。升级时若新目录不存在，会继续使用检测到的旧配置目录，保留设备、签名和构建。不要为了改名删除运行数据。
 
 运行目录权限为 700，私有配置和图像文件为 600。明确调用的截图有保留上限，预览流不落盘。签名材料、设备数据、运行日志与依赖目录均不进入源代码发布包。`WDA_URL` 可指定本机地址，默认转发端口为 18100，远程地址会被拒绝。
 
@@ -231,16 +241,16 @@ sh scripts/check.sh
 python3 scripts/package.py
 ```
 
-构建结果是自包含屏幕 HTML，源代码包位于 `dist/iphone-use-<版本>-source.zip`。安装和普通使用不需要重新构建 UI。安装后的插件仍完整保留 widget 的源码、样式、构建脚本、配置、依赖锁文件和测试，便于本地维护。
+构建结果是自包含屏幕 HTML，源代码包位于 `dist/ios-use-<版本>-source.zip`。安装和普通使用不需要重新构建 UI。安装后的插件仍完整保留 widget 的源码、样式、构建脚本、配置、依赖锁文件和测试，便于本地维护。
 
-- [屏幕预览与恢复](skills/iphone-use/references/screen.md)
-- [App 标识参考](skills/iphone-use/references/apps.md)
-- [安装与连接故障排查](skills/iphone-use-setup/references/troubleshooting.md)
+- [屏幕预览与恢复](skills/ios-use/references/screen.md)
+- [App 标识参考](skills/ios-use/references/apps.md)
+- [安装与连接故障排查](skills/ios-use-setup/references/troubleshooting.md)
 - [更新记录](CHANGELOG.md)
 
 ## 依赖与致谢
 
-本项目依赖 [Appium](https://github.com/appium/appium) 生态与 [WebDriverAgent](https://github.com/appium/WebDriverAgent)：WDA 提供手机端的自动化执行服务，[appium-ios-device](https://github.com/appium/appium-ios-device) 提供 USB 设备通信、端口转发与屏幕流连接能力。iPhone Use 在这些基础上提供 Codex 插件、MCP 工具、安装引导与屏幕 widget，无需单独运行 Appium Server。
+本项目依赖 [Appium](https://github.com/appium/appium) 生态与 [WebDriverAgent](https://github.com/appium/WebDriverAgent)：WDA 提供手机端的自动化执行服务，[appium-ios-device](https://github.com/appium/appium-ios-device) 提供 USB 设备通信、端口转发与屏幕流连接能力。iOS Use 在这些基础上提供 Codex 插件、MCP 工具、安装引导与屏幕 widget，无需单独运行 Appium Server。
 
 感谢 Appium、WebDriverAgent 及相关项目的维护者和贡献者，让真实 iPhone 的自动化操作成为可能。
 

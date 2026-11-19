@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dependency-free local MCP stdio entrypoint for iPhone Use."""
+"""Dependency-free local MCP stdio entrypoint for iOS Use."""
 import argparse
 import base64
 import collections
@@ -28,11 +28,11 @@ from analytics import Analytics
 
 PUAError=WDAError
 VERSION="0.4.0"
-SCREEN_URI="ui://iphone-use/phone-0.4.0.html"
+SCREEN_URI="ui://ios-use/phone-0.4.0.html"
 # Codex scopes reuse to the host, chat, server and UI resource. A stable result
 # ID keeps repeated READY/open/pause/resume calls in that chat on one panel,
 # including after the MCP process reconnects; no device identifiers are needed.
-SCREEN_SESSION_ID="iphone-use-screen"
+SCREEN_SESSION_ID="ios-use-screen"
 SCREEN_META={"ui":{"csp":{"connectDomains":[],"resourceDomains":[]},"prefersBorder":False},"openai/ui":{"availableDisplayModes":["fullscreen"],"preferredDisplayMode":"fullscreen"}}
 PROTOCOLS=("2025-11-25","2025-06-18","2025-03-26","2024-11-05")
 # Host transition delay, capped at .5 seconds; WDA_SETTLE_SECONDS overrides it.
@@ -105,7 +105,7 @@ SCHEMAS["screen_action"]=obj({
 APP_TOOLS=("screen_frame","screen_action")
 DESCRIPTIONS={
  "doctor":"Diagnose local Xcode, USB devices, signing prerequisites and PUA health without changing the phone. Start here for setup.",
- "setup":"Check status for first use. Reuse an active job or start a configured stopped service once. For pending startup poll status(job_id, wait_seconds=20), then READY. Missing prerequisites use iphone-use-setup.",
+ "setup":"Check status for first use. Reuse an active job or start a configured stopped service once. For pending startup poll status(job_id, wait_seconds=20), then READY. Missing prerequisites use ios-use-setup.",
  "ready":"For a screen read use screen_only=true directly. For control, check setup status first and require ready=true. After pua_timeout wait then retry READY. Follow recovery guidance without replaying actions.",
  "observe":"Fresh phone tree/screenshot, point viewport and contextual observation_id. Nodes are not proven hittable. Native snapshot limits are opt-in and incomplete, not visible-only. Image pixels x image.pixel_to_point = device points.",
  "find":"Query selector fields or a PUA predicate directly without a whole tree. Returns matches in tree order with index, type, texts and rect; this tool's selector documents the fields every selector accepts.",
@@ -344,7 +344,7 @@ class Runtime:
         with lock_path.open("a") as lock:
             lock_path.chmod(0o600)
             try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-            except BlockingIOError:raise WDAError("device_busy","Another iPhone Use operation is running. Wait for it to finish before continuing; no action was executed.")
+            except BlockingIOError:raise WDAError("device_busy","Another iOS Use operation is running. Wait for it to finish before continuing; no action was executed.")
             try:
                 if cache_path.is_file() and hasattr(self.client,"session_id"):
                     try:
@@ -563,7 +563,7 @@ class Runtime:
                 # Keep the failure truthful, but give the next read-only diagnostic.
                 original.details.update(ready=False,action_executed=False,initialization_required=True,
                     recovery={"next_tool":"pua_setup","next_arguments":{"action":"status"},"replay_action":False,
-                              "next_step":"Inspect configured/jobs/service: a connection failure or not_ready result does not prove the service is stopped. Reuse an active start/recovery job, or start once from the existing configuration/build only if the service is confirmed stopped and startup is permitted, then verify READY. Missing prerequisites use iphone-use-setup. Honor explicit no-restart or read-only instructions."})
+                              "next_step":"Inspect configured/jobs/service: a connection failure or not_ready result does not prove the service is stopped. Reuse an active start/recovery job, or start once from the existing configuration/build only if the service is confirmed stopped and startup is permitted, then verify READY. Missing prerequisites use ios-use-setup. Honor explicit no-restart or read-only instructions."})
             raise original
         info=dict(recovery.get("recovery") or {})
         job_id=recovery.get("job_id") or info.get("job_id")
@@ -708,13 +708,13 @@ def tool_result(runtime,params):
         return result
     except WDAError as exc:return result_content({"error":exc.as_dict()},structured=name=="pua_screen_action")
     except Exception as exc:
-        print("iphone-use tool failure: "+type(exc).__name__,file=sys.stderr)
+        print("ios-use tool failure: "+type(exc).__name__,file=sys.stderr)
         return result_content({"error":{"code":"internal_error","message":"Local tool failed; inspect setup status or local stderr.","uncertain":True}})
 
 
 INSTRUCTIONS=(
- "PUA means Phone Use Agent; all iPhone Use tools use the pua_ prefix. "
- "Read iphone-use-setup before setup and iphone-use for tasks. For a simple screen read call pua_ready(screen_only=true) directly with the requested device and use its image. On a warm channel use pua_observe(mode=screenshot). For setup or other first use check pua_setup(action=status); reuse a ready service or active job, or start once with the existing build only if the service is confirmed stopped. start waits up to 20 seconds; pending jobs use status(job_id, wait_seconds=20), then pua_ready(recover=true, screenshot=false); only ready=true permits phone tasks, then reuse READY's observation and the healthy channel. "
+ "PUA means Phone Use Agent; all iOS Use tools use the pua_ prefix. "
+ "Read ios-use-setup before setup and ios-use for tasks. For a simple screen read call pua_ready(screen_only=true) directly with the requested device and use its image. On a warm channel use pua_observe(mode=screenshot). For setup or other first use check pua_setup(action=status); reuse a ready service or active job, or start once with the existing build only if the service is confirmed stopped. start waits up to 20 seconds; pending jobs use status(job_id, wait_seconds=20), then pua_ready(recover=true, screenshot=false); only ready=true permits phone tasks, then reuse READY's observation and the healthy channel. "
  "If READY fails with pua_unreachable/not_ready, inspect pua_setup(action=status) rather than end the task: reuse an active start/recovery job, or start once from the existing config/build only if the service is confirmed stopped and startup is permitted; poll that job until service.ready=true, then READY again. Connection failure or service.ready=false alone does not prove the service is stopped. Missing config/source/build uses the setup skill. "
  "pua_timeout is not proof of disconnection: wait on the host for recovery.retry_after_seconds, then take one fresh screenshot observation, or retry READY when READY failed. Do not use pua_wait as a transport wait or immediately repeat the slow query. Bound delayed attempts by recovery.max_wait_retries; persistent timeouts use setup(status) diagnostically, not blind restart. action_uncertain retains transport_error to distinguish timeout from connection failure; never replay an uncertain action. pua_transport_error is unclassified, not proof of disconnect. "
  "recover=true is runtime recovery, not cold startup; for state=recovering follow its setup job until the service is ready, then READY again. Honor explicit diagnostic/no-start/no-restart instructions. "
@@ -802,13 +802,13 @@ def serve(runtime):
                 method=request["method"]
                 if method=="initialize":
                     offered=params.get("protocolVersion")
-                    result={"protocolVersion":offered if offered in PROTOCOLS else PROTOCOLS[0],"capabilities":{"tools":{"listChanged":False},"resources":{"listChanged":False}},"serverInfo":{"name":"iphone-use","version":VERSION},"instructions":INSTRUCTIONS}
+                    result={"protocolVersion":offered if offered in PROTOCOLS else PROTOCOLS[0],"capabilities":{"tools":{"listChanged":False},"resources":{"listChanged":False}},"serverInfo":{"name":"ios-use","version":VERSION},"instructions":INSTRUCTIONS}
                     try:runtime.analytics.start()
                     except Exception:pass
                 elif method=="ping":result={}
                 elif method=="tools/list":result={"tools":TOOLS}
                 elif method=="resources/list":
-                    result={"resources":[{"uri":SCREEN_URI,"name":"iPad Use Screen","title":"设备屏幕","mimeType":"text/html;profile=mcp-app","_meta":SCREEN_META}]}
+                    result={"resources":[{"uri":SCREEN_URI,"name":"iOS Use Screen","title":"设备屏幕","mimeType":"text/html;profile=mcp-app","_meta":SCREEN_META}]}
                 elif method=="resources/read":
                     if params.get("uri")!=SCREEN_URI:raise WDAError("invalid_argument","Unknown screen resource URI.")
                     html=(Path(__file__).resolve().parents[1]/"assets/phone-screen.html").read_text()

@@ -38,17 +38,17 @@ def package_files(source_package=False):
 def validate():
     manifest=json.loads((ROOT/'plugin.json').read_text());overlay=json.loads((ROOT/'.codex-plugin/plugin.json').read_text())
     ui=manifest['extensions']['com.openai']['interface']
-    assert manifest['name']=='iphone-use' and re.fullmatch(r'\d+\.\d+\.\d+',manifest['version'])
+    assert manifest['name']=='ios-use' and re.fullmatch(r'\d+\.\d+\.\d+',manifest['version'])
     assert len(ui['shortDescription'])<=30
     assert ui==overlay['interface']
     assert all(manifest[k]==overlay[k] for k in ('name','version','description'))
     assert overlay['mcpServers']=='./.mcp.json' and overlay['skills']=='./skills/'
     portable=json.loads((ROOT/'mcp.json').read_text());legacy=json.loads((ROOT/'.mcp.json').read_text())
     assert portable['mcpServers']==legacy['mcpServers']
-    assert list(portable['mcpServers'])==['iphone_use']
+    assert list(portable['mcpServers'])==['ios_use']
     for config in portable['mcpServers'].values():
         assert config['type']=='stdio' and config['args']==['${PLUGIN_ROOT}/server/iphone_use.py']
-    for skill in ('iphone-use','iphone-use-setup'):
+    for skill in ('ios-use','ios-use-setup'):
         path=ROOT/'skills'/skill/'SKILL.md';body=path.read_text()
         assert body.startswith('---\n') and re.search(r'^name: '+skill+r'$',body,re.M) and re.search(r'^description: .+',body,re.M)
     assert (ROOT/'tooling/package-lock.json').is_file()

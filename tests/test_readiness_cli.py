@@ -29,7 +29,7 @@ class FakeChild:
     def __init__(self, ready_result):
         self.stdin = CapturedInput()
         responses = [
-            {"serverInfo": {"name": "iphone-use", "version": "test"}},
+            {"serverInfo": {"name": "ios-use", "version": "test"}},
             {"tools": [{"name": "pua_ready"}]},
             {},
             ready_result,

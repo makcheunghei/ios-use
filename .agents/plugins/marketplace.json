@@ -1,14 +1,14 @@
 {
-  "name": "iphone-use-local",
+  "name": "ios-use-local",
   "interface": {
-    "displayName": "iPhone Use Local"
+    "displayName": "iOS Use Local"
   },
   "plugins": [
     {
-      "name": "iphone-use",
+      "name": "ios-use",
       "source": {
         "source": "local",
-        "path": "./dist/iphone-use"
+        "path": "./dist/ios-use"
       },
       "policy": {
         "installation": "AVAILABLE",

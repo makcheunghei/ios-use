@@ -32,7 +32,7 @@ TOOL_DESCRIPTIONS = {
 }
 
 SKILLS = {
-    "skills/iphone-use/SKILL.md": [
+    "skills/ios-use/SKILL.md": [
         ("READY 关联设备屏幕侧边栏，宿主支持时默认打开或复用本聊天已有面板；重复 setup / 恢复通道、暂停 / 恢复预览沿用同一个 widget。已有面板时直接继续，不为刷新再调用屏幕打开工具；需要重新打开已关闭的面板时调用一次 `pua_screen()`，不要为打开画面重复 READY。",
          "WorkBuddy 把设备屏幕显示在侧边栏，由 `pua_screen()` 打开，READY 不会打开它。本对话第一次 READY 成功后调用一次 `pua_screen()` 让用户观看；之后的暂停 / 恢复预览沿用同一个面板。已有面板时直接继续，不为刷新再调用 `pua_screen()`，也不要为打开画面重复 READY。"),
         ("必须调用宿主提问工具（Default 优先 `functions.request_user_input_async`），首个选项固定「已完成继续」，第二个可为「暂时无法完成」。异步返回 / 预选不是用户答复；",
@@ -40,7 +40,7 @@ SKILLS = {
         ("""通过 `functions.exec` 调工具时必须把图片真正转发给模型，不能 `text(result)` 输出整份含 base64 的结果：
 
 ```javascript
-const result = await tools.mcp__iphone_use__pua_observe({mode: "screenshot"});
+const result = await tools.mcp__ios_use__pua_observe({mode: "screenshot"});
 for (const block of result.content ?? []) {
   if (block.type === "text") text(block.text);
   else if (block.type === "image") image(block);
@@ -48,9 +48,9 @@ for (const block of result.content ?? []) {
 ```
 
 点击、输入等失败结果同样转发图片块。如果图片没转发成功，用 `view_image` 打开返回的 `image.path` / `error.observation.image.path`；不能把图片元数据或 base64 当成看过截图。""",
-         "WorkBuddy 中直接调用 `mcp__iphone_use__pua_*` 工具，截图作为图片块随同一结果返回；点击、输入等失败结果同样附带图片块。如果结果里没有看到图片，用读取文件的工具打开返回的 `image.path` / `error.observation.image.path`；不能把图片元数据或 base64 当成看过截图。"),
+         "WorkBuddy 中直接调用 `mcp__ios_use__pua_*` 工具，截图作为图片块随同一结果返回；点击、输入等失败结果同样附带图片块。如果结果里没有看到图片，用读取文件的工具打开返回的 `image.path` / `error.observation.image.path`；不能把图片元数据或 base64 当成看过截图。"),
     ],
-    "skills/iphone-use/references/authentication.md": [
+    "skills/ios-use/references/authentication.md": [
         ("""在 Codex Default 模式优先调用 `functions.request_user_input_async`，例如当前明确显示 Face ID 时：
 
 ```json
@@ -68,15 +68,15 @@ for (const block of result.content ?? []) {
         ("异步提问会立即返回，这不是用户完成通知。保持问题待答，等待用户实际提交选项或明确回复；预选项、工具返回、等待时间经过和没有答复都不能当作完成。",
          "以用户实际提交的选项或明确回复为准；提问被跳过、超时、没有答复，或工具在用户作答前就返回，都不能当作完成。"),
     ],
-    "skills/iphone-use/references/tool-fallback.md": [
+    "skills/ios-use/references/tool-fallback.md": [
         ("普通版提供 18 个模型工具；先查看本回合实际可调用的工具绑定（支持时用 ALL_TOOLS 或工具搜索），不能只从 tools/list、文档或先前聊天推断已经绑定。0.1.6 的 install.sh 同时注册同名标准 MCP，避免 Codex 插件共享说明预算隐藏工具，并保留完整 batch schema。新版安装后重新连接聊天；",
-         "普通版提供 18 个模型工具，WorkBuddy 中名为 `mcp__iphone_use__pua_*`；先查看本回合实际可调用的工具绑定，不能只从 tools/list、文档或先前聊天推断已经绑定。WorkBuddy 版由 `workbuddy/install.py` 把标准 MCP `iphone_use` 写入 `~/.workbuddy/mcp.json`；安装或更新后需要在「连接器管理」信任该服务并新开会话；"),
+         "普通版提供 18 个模型工具，WorkBuddy 中名为 `mcp__ios_use__pua_*`；先查看本回合实际可调用的工具绑定，不能只从 tools/list、文档或先前聊天推断已经绑定。WorkBuddy 版由 `workbuddy/install.py` 把标准 MCP `ios_use` 写入 `~/.workbuddy/mcp.json`；安装或更新后需要在「连接器管理」信任该服务并新开会话；"),
         ("通过 `functions.exec` 时逐个内容块转发：文字用 `text(block.text)`，图片用 `image(block)`；不要 `text(result)` 把截图变成 base64 文本。图片无法转发时用 `view_image` 打开 `image.path` / `error.observation.image.path`。",
          "截图作为图片块随结果返回；结果里没有看到图片时，用读取文件的工具打开 `image.path` / `error.observation.image.path`，不要把 base64 文本当成截图。"),
         ("从当前项目或已安装插件确定 `<PLUGIN_ROOT>`，不要照抄某人的版本 cache 路径。",
-         "WorkBuddy 版的 `<PLUGIN_ROOT>` 是安装目录，默认 `~/.workbuddy/mcp-servers/iphone-use`；以 `~/.workbuddy/mcp.json` 中 `iphone_use` 的实际路径为准。"),
+         "WorkBuddy 版的 `<PLUGIN_ROOT>` 是安装目录，默认 `~/.workbuddy/mcp-servers/ios-use`；以 `~/.workbuddy/mcp.json` 中 `ios_use` 的实际路径为准。"),
     ],
-    "skills/iphone-use-setup/SKILL.md": [
+    "skills/ios-use-setup/SKILL.md": [
         ("READY 同时关联设备屏幕侧边栏，宿主支持时默认打开；已有通道要重新打开画面用 `pua_screen()`，不要重复 READY。",
          "WorkBuddy 中 READY 不会打开设备屏幕；取得 READY 后调用一次 `pua_screen()` 在侧边栏打开，已有面板时不再调用，也不要重复 READY。"),
         ("并必须调用可用的宿主提问工具（Default 优先 `functions.request_user_input_async`），",
@@ -86,19 +86,19 @@ for (const block of result.content ?? []) {
 
 # Appended to the skill so the model knows what is specific to this host.
 SKILL_NOTES = {
-    "skills/iphone-use/SKILL.md": """
+    "skills/ios-use/SKILL.md": """
 ## 在 WorkBuddy 中使用
 
-- 工具名为 `mcp__iphone_use__pua_*`，由 `~/.workbuddy/mcp.json` 中的标准 MCP `iphone_use` 提供。本回合没有这些工具时，请用户在「连接器管理」信任 `iphone_use` 并新开会话。
+- 工具名为 `mcp__ios_use__pua_*`，由 `~/.workbuddy/mcp.json` 中的标准 MCP `ios_use` 提供。本回合没有这些工具时，请用户在「连接器管理」信任 `ios_use` 并新开会话。
 - 设备屏幕在 WorkBuddy 侧边栏，由 `pua_screen()` 打开并复用。面板底部没有刷新 / 主屏幕 / 截图按钮：WorkBuddy 不放行面板自己发起的工具调用，预览恢复只能由 `pua_screen(action="resume")` 或解锁后的 READY 完成，不要让用户去点刷新。面板没有画面不影响控制通道，也不是任务失败；按工具返回的观察继续。
-- 运行数据在 `~/.local/share/iphone-use`，与 Codex 版共用同一份配置、构建和操作锁；返回 `device_busy` 时可能是另一个宿主正在操作设备。
+- 运行数据在 `~/.local/share/ios-use`，与 Codex 版共用同一份配置、构建和操作锁；返回 `device_busy` 时可能是另一个宿主正在操作设备。
 """,
-    "skills/iphone-use-setup/SKILL.md": """
+    "skills/ios-use-setup/SKILL.md": """
 ## 在 WorkBuddy 中使用
 
-- 工具名为 `mcp__iphone_use__pua_*`。本回合没有这些工具时，请用户在「连接器管理」信任 `iphone_use` 并新开会话。
-- WorkBuddy 是 GUI 应用，启动 MCP 时 PATH 不完整；安装器已把 node、npm、git 和 Xcode 命令所在目录写进 `~/.workbuddy/mcp.json` 中 `iphone_use` 的 `env.PATH`。`pua_doctor` 报告缺少 node / npm 而本机实际已安装时，在源码目录重新运行 `python3 workbuddy/install.py` 刷新路径，不要重装 Node。
-- 运行数据在 `~/.local/share/iphone-use`；Codex 版已经配置并构建过时直接复用，不重新 fetch / configure / build。
+- 工具名为 `mcp__ios_use__pua_*`。本回合没有这些工具时，请用户在「连接器管理」信任 `ios_use` 并新开会话。
+- WorkBuddy 是 GUI 应用，启动 MCP 时 PATH 不完整；安装器已把 node、npm、git 和 Xcode 命令所在目录写进 `~/.workbuddy/mcp.json` 中 `ios_use` 的 `env.PATH`。`pua_doctor` 报告缺少 node / npm 而本机实际已安装时，在源码目录重新运行 `python3 workbuddy/install.py` 刷新路径，不要重装 Node。
+- 运行数据在 `~/.local/share/ios-use`；Codex 版已经配置并构建过时直接复用，不重新 fetch / configure / build。
 """,
 }
 
@@ -128,7 +128,7 @@ SKILL_NOTES = {
 # Height. Opened from chat history WorkBuddy shows the view inline, at a small default height
 # that changes only when the view reports a size. The widget lays itself out from its
 # container and never reports one, so it asks once for room for the phone.
-FRAME_URI = "ui://iphone-use/frame/"
+FRAME_URI = "ui://ios-use/frame/"
 SCREEN_HEIGHT = 680
 # Lets the page's fetch reach the frame source; pictures are drawn from data: URLs as before.
 SCREEN_CONNECT = ["http://127.0.0.1:*"]

@@ -136,15 +136,15 @@ class Analytics:
                     "event": event, "distinct_id": self.ident, "uuid": str(uuid.uuid4()),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "properties": {
-                        "app_name": "iphone-use", "app_version": self.version,
+                        "app_name": "ios-use", "app_version": self.version,
                         "app_surface": "local_mcp", "source": "codex_plugin_mcp",
-                        "$lib": "iphone-use-mcp", "$process_person_profile": False,
+                        "$lib": "ios-use-mcp", "$process_person_profile": False,
                         "$geoip_disable": True, "session_id": self.session_id,
                         "platform": platform.system(), "environment": environment(), **safe_properties(properties),
                     },
                 })
                 if self.worker is None:
-                    self.worker = threading.Thread(target=self._deliver, name="iphone-use-analytics", daemon=True)
+                    self.worker = threading.Thread(target=self._deliver, name="ios-use-analytics", daemon=True)
                     self.worker.start()
             return True
         except Exception:

@@ -159,7 +159,7 @@ class ScreenProtocolTests(unittest.TestCase):
         self.assertEqual(content["_meta"]["openai/ui"]["availableDisplayModes"], ["fullscreen"])
 
     def test_invalid_resource_uri_cannot_read_files_and_following_ping_survives(self):
-        invalid = ["file:///etc/passwd", "ui://iphone-use/../config.json", "", None, [], {}]
+        invalid = ["file:///etc/passwd", "ui://ios-use/../config.json", "", None, [], {}]
         requests = [{"jsonrpc": "2.0", "id": index, "method": "resources/read", "params": {"uri": uri}}
                     for index, uri in enumerate(invalid)]
         requests.append({"jsonrpc": "2.0", "id": "still-alive", "method": "ping"})

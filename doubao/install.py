@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Prepare iPhone Use for Doubao Work: an installed server and two skills ready to add.
+"""Prepare iOS Use for Doubao Work: an installed server and two skills ready to add.
 
 Doubao Work keeps custom connectors and skills in the account, entered through its own
 window, so nothing in it can be registered from a script. This puts the server in a fixed
 directory, proves it starts, and prints what to type into the connector form and which
-folders to upload as skills. Phone state stays in ~/.local/share/iphone-use, shared with
+folders to upload as skills. Phone state stays in ~/.local/share/ios-use, shared with
 the Codex and WorkBuddy installs.
 """
 import argparse
@@ -32,9 +32,9 @@ def workbuddy_installer():
 
 shared = workbuddy_installer()
 InstallError = shared.InstallError
-NAME = "iphone-use-doubao"
-CONNECTOR = "iphone_use"
-SKILLS = ("iphone-use", "iphone-use-setup")
+NAME = "ios-use-doubao"
+CONNECTOR = "ios_use"
+SKILLS = ("ios-use", "ios-use-setup")
 MARKER = ".doubao-install.json"
 ENTRY = "doubao/mcp_stdio.py"
 RUNTIME_FILES = ("mcp_stdio.py", "doubao_text.py")
@@ -81,7 +81,7 @@ def connector(install_dir, python):
 def install(install_dir, python, analytics=False, force=False):
     if install_dir.exists() and not (install_dir / MARKER).is_file() and not force:
         raise InstallError(f"{install_dir} exists and was not installed by this script. Move it or pass --force.")
-    with tempfile.TemporaryDirectory(prefix="iphone-use-stage-") as staging:
+    with tempfile.TemporaryDirectory(prefix="ios-use-stage-") as staging:
         staged = Path(staging) / NAME
         staged.mkdir()
         version = stage(staged, analytics)
@@ -119,7 +119,7 @@ def main():
             print(f"In Doubao Work, 插件 · 技能 · 伙伴 > 管理: remove the connector {CONNECTOR} and the skills {', '.join(SKILLS)}.")
             return 0
         if sys.platform != "darwin":
-            raise InstallError("iPhone Use needs macOS with Xcode.")
+            raise InstallError("iOS Use needs macOS with Xcode.")
         python = shutil.which(args.python) or args.python
         if not Path(python).is_absolute() or not os.access(python, os.X_OK):
             raise InstallError(f"--python must resolve to an executable: {args.python}")
@@ -127,7 +127,7 @@ def main():
     except (InstallError, doubao_text.Drift) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
-    print(f"iPhone Use {result['version']} prepared for Doubao Work ({result['tools']} tools) in {result['install_dir']}.")
+    print(f"iOS Use {result['version']} prepared for Doubao Work ({result['tools']} tools) in {result['install_dir']}.")
     if not all(shutil.which(name) for name in ("node", "npm")):
         print("warning: node or npm was not found on PATH; install Node.js 20.19+ and run this script again.")
     print("\nIn Doubao Work, 插件 · 技能 · 伙伴 > 添加 > 新建自定义连接器:")

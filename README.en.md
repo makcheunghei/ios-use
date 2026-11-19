@@ -1,8 +1,8 @@
-# iPhone Use
+# iOS Use
 
 [中文](README.md) · **English**
 
-![iPhone Use controlling a real iPhone in Codex with a live screen preview](assets/iphone-use-demo.png)
+![iOS Use controlling a real iPhone in Codex with a live screen preview](assets/ios-use-demo.png)
 
 Let Codex, WorkBuddy, or Doubao Work operate your real iPhone over USB. Describe a task in natural language: open apps, read screens, tap, scroll, enter text, collect lists, and watch the phone in a sidebar widget.
 
@@ -10,7 +10,17 @@ The plugin connects to [WebDriverAgent](https://github.com/appium/WebDriverAgent
 
 The plugin sends anonymous usage statistics to its own PostHog project by default: starts, tool calls, connection results, durations and error categories. It uses a random installation ID and never uploads phone images, input text or device identifiers. Set `IPHONE_USE_ANALYTICS=0` or `DO_NOT_TRACK=1` and restart the MCP server to disable it. See [analytics documentation](ANALYTICS.md).
 
-**Before using iPhone Use, install, sign, and start WDA Runner on your own iPhone.** WDA is the on-device execution service. The prompts and setup workflow below can help your host assistant complete the initial installation; a healthy existing WDA can be reused.
+**Before using iOS Use, install, sign, and start WDA Runner on your own iPhone.** WDA is the on-device execution service. The prompts and setup workflow below can help your host assistant complete the initial installation; a healthy existing WDA can be reused.
+
+## Use through Magpie
+
+Run this from a persistent checkout on the Mac connected to the devices. With the Magpie MCP router enabled, Codex can access the local USB service through its existing Magpie connection.
+
+```sh
+magpie library mcp add ios_use /usr/bin/python3 "$PWD/server/iphone_use.py" agents=codex --local
+```
+
+Existing installations reuse their device profiles, signed builds and ports under `~/.local/share/iphone-use`. This project derives from [iPhone Use](https://github.com/zhongerxin/iPhone-use).
 
 ## Recent updates
 
@@ -28,15 +38,15 @@ October 9–13, 2026. See the [changelog](CHANGELOG.md) for details.
 Paste this prompt into Codex running on your Mac:
 
 ```text
-Install and configure iPhone Use for me:
-https://github.com/zhongerxin/iPhone-use
+Install and configure iOS Use for me:
+https://github.com/makcheunghei/ios-use
 
 Read the repository README and installation script first. Check Codex CLI,
 Python, Node.js, npm, full Xcode, and the iPhone connected over USB.
 Clone the project into a suitable local directory and run sh scripts/install.sh.
 
 If this chat cannot load the new tools, tell me to reconnect or start a new chat
-and continue there. Once tools are available, read the iphone-use-setup skill.
+and continue there. Once tools are available, read the ios-use-setup skill.
 Inspect existing configuration and reuse healthy WDA. For initial setup,
 discover my device, use my own Apple development team and signable bundle ID,
 fetch the pinned WDA, configure signing, build and start it. Continue until
@@ -56,25 +66,25 @@ Both hosts can control a real iPhone over USB and show its live screen in a side
 
 | Host | Run from the source directory | Connect after installation |
 | --- | --- | --- |
-| [WorkBuddy](https://github.com/zhongerxin/iPhone-use/blob/main/workbuddy/README.md) | `python3 workbuddy/install.py` | Trust `iphone_use` in Connector Management, then start a new chat |
-| [Doubao Work](https://github.com/zhongerxin/iPhone-use/blob/main/doubao/README.md) | `python3 doubao/install.py` | Add a STDIO connector using the installer output, upload both skills, then start a Local Computer task |
+| [WorkBuddy](https://github.com/makcheunghei/ios-use/blob/main/workbuddy/README.md) | `python3 workbuddy/install.py` | Trust `ios_use` in Connector Management, then start a new chat |
+| [Doubao Work](https://github.com/makcheunghei/ios-use/blob/main/doubao/README.md) | `python3 doubao/install.py` | Add a STDIO connector using the installer output, upload both skills, then start a Local Computer task |
 
 Paste the matching prompt into the host running on your Mac. The assistant can perform the local installation and explain any host UI steps it cannot complete. First-time signing uses your own Apple account and development team.
 
 ### Prompt for WorkBuddy
 
 ```text
-Install iPhone Use on this Mac so WorkBuddy can operate my real iPhone over USB:
-https://github.com/zhongerxin/iPhone-use
+Install iOS Use on this Mac so WorkBuddy can operate my real iPhone over USB:
+https://github.com/makcheunghei/ios-use
 
 Read README.en.md, workbuddy/README.md, and the installer first. Check Python,
 Node.js, npm, full Xcode, and the USB iPhone. Clone or reuse a local checkout,
 preserve existing changes, and run python3 workbuddy/install.py from its root.
-Do not run the Codex installer. Trust and enable iphone_use in WorkBuddy's
+Do not run the Codex installer. Trust and enable ios_use in WorkBuddy's
 Connector Management, then start a new chat to load the tools and skills.
 If I need to complete a UI step, give its exact location and wait for me.
 
-Once tools are available, read iphone-use-setup and check setup status first.
+Once tools are available, read ios-use-setup and check setup status first.
 Reuse existing configuration, healthy WDA, or an active startup job. For initial
 setup, use my own device and Apple development team to sign and start WDA.
 After pua_ready returns ready=true, call pua_screen() once to show the live
@@ -86,21 +96,21 @@ wait for me. Do not copy the author's device identifiers or signing settings.
 ### Prompt for Doubao Work
 
 ```text
-Install iPhone Use on this Mac so Doubao Work can operate my real iPhone over USB:
-https://github.com/zhongerxin/iPhone-use
+Install iOS Use on this Mac so Doubao Work can operate my real iPhone over USB:
+https://github.com/makcheunghei/ios-use
 
 In a Local Computer task, read README.en.md, doubao/README.md, and the installer.
 Check Python, Node.js, npm, full Xcode, and the USB iPhone. Clone or reuse a local
 checkout, preserve existing changes, and run python3 doubao/install.py from
 its root. Do not run the Codex installer. In Plugins · Skills · Partners, create
-an iphone_use STDIO connector with the absolute command and argument paths
-printed by the installer. Upload the iphone-use and iphone-use-setup skill
+an ios_use STDIO connector with the absolute command and argument paths
+printed by the installer. Upload the ios-use and ios-use-setup skill
 folders from the installation directory. Enable the connector and both skills,
 then start a new Local Computer task. Toggle an existing connector off and on
 after updating. Give exact UI locations and paths for steps I need to complete,
 and wait for me before continuing.
 
-Once tools are available, read iphone-use-setup and check setup status first.
+Once tools are available, read ios-use-setup and check setup status first.
 Reuse existing configuration, healthy WDA, or an active startup job. For initial
 setup, use my own device and Apple development team to sign and start WDA.
 After pua_ready returns ready=true, call pua_screen() once to show the live
@@ -128,7 +138,7 @@ Xcode must support the phone's iOS version. No jailbreak or separate Appium Serv
 
 The phone-side service comes from [Appium's WebDriverAgent](https://github.com/appium/WebDriverAgent). First-time setup signs and installs `WebDriverAgentRunner` using your own Apple account and development team.
 
-The installation prompt and `iphone-use-setup` workflow fetch the project's pinned WDA version, configure signing, build, deploy, and start it. Codex will explain any steps requiring your input.
+The installation prompt and `ios-use-setup` workflow fetch the project's pinned WDA version, configure signing, build, deploy, and start it. Codex will explain any steps requiring your input.
 
 For manual Xcode setup:
 
@@ -141,16 +151,16 @@ After installing the plugin and configuring USB connectivity, start phone tasks 
 ## Install and connect
 
 ```sh
-git clone https://github.com/zhongerxin/iPhone-use.git
-cd iPhone-use
+git clone https://github.com/makcheunghei/ios-use.git
+cd ios-use
 sh scripts/install.sh
 ```
 
-The installer validates and stages the source, registers a local Codex marketplace, installs the plugin and skills, and registers the installed server as standard MCP `iphone_use`. Plugin and standard configuration share the same namespace to avoid duplicate tools. An extracted source package uses the same installation command.
+The installer validates and stages the source, registers a local Codex marketplace, installs the plugin and skills, and registers the installed server as standard MCP `ios_use`. Plugin and standard configuration share the same namespace to avoid duplicate tools. An extracted source package uses the same installation command.
 
-Reconnect or start a new chat, enable **iPhone Use**, and ask:
+Reconnect or start a new chat, enable **iOS Use**, and ask:
 
-> Use iphone-use-setup to configure my USB-connected iPhone, install and start WDA, verify READY, and show the phone screen.
+> Use ios-use-setup to configure my USB-connected iPhone, install and start WDA, verify READY, and show the phone screen.
 
 Setup covers diagnostics, device discovery, signing configuration, download, background build, and startup. Existing configurations and builds are reused. Phone tasks start only after `pua_ready` returns `ready=true`.
 
@@ -215,7 +225,7 @@ Abnormal UI states return a screenshot for the model to inspect before choosing 
 
 ## Runtime data and updates
 
-New installations use `~/.local/share/iphone-use/`. Set `IPHONE_USE_STATE_DIR` for another external directory; `WDA_STATE_DIR` remains supported. If the new default directory does not exist, an existing older configuration directory is reused so device configuration and builds are retained.
+New installations use `~/.local/share/ios-use/`. Set `IPHONE_USE_STATE_DIR` for another external directory; `WDA_STATE_DIR` remains supported. If the new default directory does not exist, an existing older configuration directory is reused so device configuration and builds are retained.
 
 Runtime directories use mode 700 and private configuration / image files use 600. Explicit screenshots have retention limits; preview streams stay in memory. Signing material, device data, logs, and dependency directories are excluded from source packages. `WDA_URL` accepts a local address; the default forwarded port is 18100, and remote addresses are rejected.
 
@@ -235,13 +245,13 @@ sh scripts/check.sh
 python3 scripts/package.py
 ```
 
-The UI builds into self-contained HTML. Source packages are written to `dist/iphone-use-<version>-source.zip`; normal installation and use do not require rebuilding the UI. Installed plugins retain the complete widget source, styles, build scripts, configuration, dependency lockfile, and widget tests for local maintenance.
+The UI builds into self-contained HTML. Source packages are written to `dist/ios-use-<version>-source.zip`; normal installation and use do not require rebuilding the UI. Installed plugins retain the complete widget source, styles, build scripts, configuration, dependency lockfile, and widget tests for local maintenance.
 
-See [screen preview and recovery](skills/iphone-use/references/screen.md), [app identifiers](skills/iphone-use/references/apps.md), [troubleshooting](skills/iphone-use-setup/references/troubleshooting.md), and [changelog](CHANGELOG.md).
+See [screen preview and recovery](skills/ios-use/references/screen.md), [app identifiers](skills/ios-use/references/apps.md), [troubleshooting](skills/ios-use-setup/references/troubleshooting.md), and [changelog](CHANGELOG.md).
 
 ## Dependencies and acknowledgements
 
-This project relies on the [Appium](https://github.com/appium/appium) ecosystem and [WebDriverAgent](https://github.com/appium/WebDriverAgent). WDA provides the on-device automation service; [appium-ios-device](https://github.com/appium/appium-ios-device) provides USB device communication, port forwarding, and screen-stream connectivity. iPhone Use adds the Codex plugin, MCP tools, setup guidance, and screen widget. A separate Appium Server is not required.
+This project relies on the [Appium](https://github.com/appium/appium) ecosystem and [WebDriverAgent](https://github.com/appium/WebDriverAgent). WDA provides the on-device automation service; [appium-ios-device](https://github.com/appium/appium-ios-device) provides USB device communication, port forwarding, and screen-stream connectivity. iOS Use adds the Codex plugin, MCP tools, setup guidance, and screen widget. A separate Appium Server is not required.
 
 Thanks to the maintainers and contributors of Appium, WebDriverAgent, and related projects for making real iPhone automation possible.
 
